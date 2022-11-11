@@ -269,27 +269,18 @@ thread_unblock (struct thread *t) {
 	ctrl+f => 구현 파트#################################################
 */
 
+// idle일때는 다른 곳에서 체크하는 걸로 결론
 void
 thread_sleep(int64_t ticks){ // 깨울 시간
 	struct thread* curr = thread_current();
-	// 변수로 일어날 시간 할당
-	// 변수 = 현재 tick구하는 함수()
-
-	if (curr != idle_thread){ // 바쁜 running thread
-		curr->status = THREAD_BLOCKED;
-		curr->tick = ticks;
-		list_push_back(&sleep_list, curr);
-
-		// thread_awake(); // 왜 현재 시간을 줘야하나 why? 
-	}
-	/* 대기 */
-	else if (curr == idle_thread){
-		curr->status = THREAD_BLOCKED;
-		curr->tick = ticks;
-	}
 	
+	int64_t start = timer_ticks(); // 현재 시간
 
-
+	if (curr != idle_thread){ 
+		curr->status = THREAD_BLOCKED;
+		curr->tick = ticks;
+		list_push_back(&sleep_list, &(curr->elem));	 
+	}
 	return;
 	/* 
 		구현:
@@ -305,7 +296,13 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 }
 
 void
-thread_awake(int64_t ticks){ //  현재 시간
+thread_awake(int64_t ticks){ // 현재시간
+	struct list* cur = list_front(&sleep_list);
+	
+	
+	
+
+
 	/* sleep list의 모든 entry를 순회하며 다음과 같은 작업을 수행한다 */
 	/* 현재 tick이 깨워야 할 tick 보다 크거나 같다면 슬립 큐에서 제거하고 unblock 한다 */
 	/* 작다면 update_next_tick_to_awake()를 호출한다 */
