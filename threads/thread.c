@@ -26,7 +26,10 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+static struct list ready_list; // 새로 생성된 쓰레드가 들어가는 곳
+
+/* Sleep list 자료구조 추가 */
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -39,6 +42,9 @@ static struct lock tid_lock;
 
 /* Thread destruction requests */
 static struct list destruction_req;
+
+/* sleep_list에서 대기중인 쓰레드들의 wakeup_tick 값 중 최소값을 저장 */
+int next_tick_to_awake = INT64_MAX;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -62,6 +68,14 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+
+/* Thread sleep과 awake 구현 */
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+void update_next_tick_to_awake(int64_t ticks);
+int64_t get_next_tick_to_awake(void);
+
+
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -92,8 +106,10 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
+
 void
 thread_init (void) {
+	/* Sleep queue 자료구조 초기화 코드 추가 */
 	ASSERT (intr_get_level () == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel
@@ -244,6 +260,46 @@ thread_unblock (struct thread *t) {
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
+
+/* 
+	ctrl+f => 구현 파트#################################################
+*/
+
+void
+thread_sleep(int64_t ticks){
+	/* 
+		구현:
+			-현재 스레드가 idle 스레드가 아닐경우
+			-thread의 상태를 blocked로 바꾸고 깨어나야 할 ticks을 저장,
+			-sleep queue에 삽입하고, awake 함수가 실행되어야 할 tick값을 update	
+			-thread를 blocked 상태로 만들고 sleep queue에 삽입하여 대기
+			-timer_sleep() 함수에 의해 호출
+	 */
+	 /* 현재 스레드를 슬립 큐에 삽입한 후에 스케줄한다 */
+	 /* 해당 과정중에는 인터럽트를 받아들이지 않는다 */
+	 /* 실행 중인 쓰레드를 sleep으로 만듬 */
+}
+
+void
+thread_awake(int64_t ticks){
+	/* sleep list의 모든 entry를 순회하며 다음과 같은 작업을 수행한다 */
+	/* 현재 tick이 깨워야 할 tick 보다 크거나 같다면 슬립 큐에서 제거하고 unblock 한다 */
+	/* 작다면 update_next_tick_to_awake()를 호출한다 */
+	/* sleep queue에서 깨워야할 쓰레드를 깨움 */
+	/* wakeup_tick값이 ticks보다 작거나 같은 쓰레드를 깨움 */
+	/* 현재 대기중인 쓰레들의 wakeup_tick변수 중 가장 작은 값을 next_tick_to_awake 전역 변수에 저장 */
+}
+
+void update_next_tick_to_awake(int64_t ticks){
+	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
+	/* 최소 tick을 가진 쓰레드 저장 */
+	/* next_tick_to_awake 변수 업데이트 */
+}
+
+int64_t get_next_tick_to_awake(void){
+	/* next_tick_to_awake을 반환한다 */
+}
+
 
 /* Returns the name of the running thread. */
 const char *
@@ -538,19 +594,23 @@ do_schedule(int status) {
 	schedule ();
 }
 
+/* 
+	현재 실행 중인 쓰레드와 다음 쓰레드의 교환
+
+*/
 static void
 schedule (void) {
-	struct thread *curr = running_thread ();
-	struct thread *next = next_thread_to_run ();
+	struct thread *curr = running_thread (); 
+	struct thread *next = next_thread_to_run (); // run queue에서 가져오는데, 없으면 idle queue에서 가져온다
 
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (curr->status != THREAD_RUNNING);
 	ASSERT (is_thread (next));
 	/* Mark us as running. */
-	next->status = THREAD_RUNNING;
+	next->status = THREAD_RUNNING; // running status로 수정
 
 	/* Start new time slice. */
-	thread_ticks = 0;
+	thread_ticks = 0; // 새로운 tick을 설정한다
 
 #ifdef USERPROG
 	/* Activate the new address space. */
@@ -558,6 +618,7 @@ schedule (void) {
 #endif
 
 	if (curr != next) {
+		struct thread* a = switch_threads(curr, next);
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
@@ -572,7 +633,7 @@ schedule (void) {
 
 		/* Before switching the thread, we first save the information
 		 * of current running. */
-		thread_launch (next);
+		thread_launch (next); 
 	}
 }
 
