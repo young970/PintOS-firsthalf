@@ -88,13 +88,43 @@ timer_elapsed (int64_t then) {
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+/* Sleep queue를 이용하도록 함수 수정 */
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
+	/* 기존의 busy waiting을 유발하는 코드를 삭제*/
+	/* 새로 구현한 thread를 sleep queue를 삽입하는 함수를 호출*/
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+	/* 
+		구현: 
+			-Blocked thread를 tick 이후에 ready_list에 삽입, 
+			-thread를 ready_list에서 제거, sleep queue에 추가
+			-wake up 수행 => timer interrupt가 발생시 tick 체크
+			-시간이 다 된 thread는 sleep queue에서 삭제, ready_list에 추가
+			-sleep queue를 이용하도록 함수 수정
+			- 새로 구현한 thread를 sleep queue에 삽입하는 함수를 호출
+
+		thread_yield() 함수 설명
+		thread_current()
+		 현재 실행 되고 있는 thread를 반환
+		intr_disable()
+		 인터럽트를 비활성하고 이전 인터럽트의 상태를 반환
+		intr_set_level(old_level)
+		 인자로 전달된 인터럽트 상태로 인터럽트를 설정 하고 이전 인터럽트 상태를 반환
+		list_push_back(&ready_list, &cur->elem)
+		 주어진 entry를 list의 마지막에 삽입
+		schedule()
+		 컨텍스트 스위치 작업을 수행
+
+		thread_yield(): cpu를 양보하고 thread를 ready_list에 삽입
+		timer_ticks(): 현재 진행되고 있는 tick의 값을 반환
+		timer_elased(): 인자로 전달 된 tick이후 몇 tick이 지났는지 반환
+
+	*/
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +156,9 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+	/* 매 tick마다 sleep queue에서 깨어날 thread가 있는지 확인하여,
+		깨우는 함수를 호출하도록 한다.
+	*/
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
