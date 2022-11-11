@@ -28,14 +28,15 @@
    that are ready to run but not actually running. */
 static struct list ready_list; // 새로 생성된 쓰레드가 들어가는 곳
 
-/* Sleep list 자료구조 추가 */
+/* 구현: Sleep list 자료구조 추가 */
 static struct list sleep_list;
 
 /* Idle thread. */
-static struct thread *idle_thread;
+static struct thread *idle_thread; // cpu를 갖고 있지만, 디스크 업무로 인해 아무 일도 안하는
+// running thread
 
 /* Initial thread, the thread running init.c:main(). */
-static struct thread *initial_thread;
+static struct thread *initial_thread; // 그냥 빈 thread 초기에 할당 해주는 놈이야
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
@@ -43,7 +44,7 @@ static struct lock tid_lock;
 /* Thread destruction requests */
 static struct list destruction_req;
 
-/* sleep_list에서 대기중인 쓰레드들의 wakeup_tick 값 중 최소값을 저장 */
+/* 구현: sleep_list에서 대기중인 쓰레드들의 wakeup_tick 값 중 최소값을 저장 */
 int next_tick_to_awake = INT64_MAX;
 
 /* Statistics. */
@@ -109,7 +110,7 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
 void
 thread_init (void) {
-	/* Sleep queue 자료구조 초기화 코드 추가 */
+	
 	ASSERT (intr_get_level () == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel
@@ -125,6 +126,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+
+	/* Sleep queue 자료구조 초기화 코드 추가 */
+	list_init(&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -266,7 +270,27 @@ thread_unblock (struct thread *t) {
 */
 
 void
-thread_sleep(int64_t ticks){
+thread_sleep(int64_t ticks){ // 깨울 시간
+	struct thread* curr = thread_current();
+	// 변수로 일어날 시간 할당
+	// 변수 = 현재 tick구하는 함수()
+
+	if (curr != idle_thread){ // 바쁜 running thread
+		curr->status = THREAD_BLOCKED;
+		curr->tick = ticks;
+		list_push_back(&sleep_list, curr);
+
+		// thread_awake(); // 왜 현재 시간을 줘야하나 why? 
+	}
+	/* 대기 */
+	else if (curr == idle_thread){
+		curr->status = THREAD_BLOCKED;
+		curr->tick = ticks;
+	}
+	
+
+
+	return;
 	/* 
 		구현:
 			-현재 스레드가 idle 스레드가 아닐경우
@@ -281,7 +305,7 @@ thread_sleep(int64_t ticks){
 }
 
 void
-thread_awake(int64_t ticks){
+thread_awake(int64_t ticks){ //  현재 시간
 	/* sleep list의 모든 entry를 순회하며 다음과 같은 작업을 수행한다 */
 	/* 현재 tick이 깨워야 할 tick 보다 크거나 같다면 슬립 큐에서 제거하고 unblock 한다 */
 	/* 작다면 update_next_tick_to_awake()를 호출한다 */
