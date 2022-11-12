@@ -283,7 +283,7 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 		curr->status = THREAD_BLOCKED;// => THREAD_RUNNING?? 
 		curr->tick = ticks;
 		list_push_back(&sleep_list, &(curr->elem));	
-
+		do_schedule (THREAD_READY);  // 내가 자체 수정 시도
 		intr_set_level (old_level); // cpu가 interrupt를 듣게한다
 
 		thread_awake(start); // 새로운 thread를 시작한다
@@ -659,7 +659,6 @@ schedule (void) {
 #endif
 
 	if (curr != next) {
-		struct thread* a = switch_threads(curr, next);
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
