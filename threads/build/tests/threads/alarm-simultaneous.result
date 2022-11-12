@@ -1,0 +1,18 @@
+FAIL
+Kernel panic in run: PANIC at ../../devices/timer.c:95 in timer_sleep(): assertion `intr_get_level () == INTR_ON' failed.
+Call stack: 0x8004213410 0x800420d0c4 0x800420d1de 0x8004208950 0x8004208d6e 0x8004207ad0 0x800420e07d 0x80042167c4 0x8004216735 0x800421095c 0x80042165e4 0x8004210913 0x800420ceb1 0x80042060f7
+Translation of call stack:
+0x0000008004213410: debug_panic (lib/kernel/debug.c:32)
+0x000000800420d0c4: timer_sleep (devices/timer.c:96)
+0x000000800420d1de: timer_interrupt (devices/timer.c:136)
+0x0000008004208950: intr_handler (threads/interrupt.c:352)
+0x0000008004208d6e: intr_entry (threads/intr-stubs.o:?)
+0x0000008004207ad0: intr_set_level (threads/interrupt.c:131 (discriminator 1))
+0x000000800420e07d: serial_putc (devices/serial.c:123)
+0x00000080042167c4: putchar_have_lock (lib/kernel/console.c:176)
+0x0000008004216735: vprintf_helper (lib/kernel/console.c:166)
+0x000000800421095c: __vprintf (lib/stdio.c:154)
+0x00000080042165e4: vprintf (lib/kernel/console.c:123)
+0x0000008004210913: printf (lib/stdio.c:80)
+0x000000800420ceb1: timer_calibrate (devices/timer.c:58)
+0x00000080042060f7: main (threads/init.c:119)
