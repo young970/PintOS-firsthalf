@@ -279,7 +279,7 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 
 		old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
 		curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
-		curr->tick = ticks;
+		curr->tick = ticks; // 1 tick 후 깨어남
 		list_push_back(&sleep_list, &(curr->elem));	
 
 		// do_schedule(THREAD_READY);
@@ -287,7 +287,8 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 		/* !!!! !!!!!!!!!!!!!!!!!!!!!!!!!
 		awake 함수가 실행되어야 할 tick값을 update pg182 */
 		thread_awake(start); // 새로운 thread를 시작한다
-
+		
+		schedule();
 		intr_set_level (old_level); // !!!! 위치를 어디???  cpu가 interrupt를 듣게한다
 	}
 
@@ -307,12 +308,6 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 
 void
 thread_awake(int64_t ticks){ // 현재시간
-	/* 
-	!!!!!!!!!!!!!!!!!!!!
-	schedule() 포함해야하지 않을가?
-	시간이 된 thread는 sleep_list에서 ready_list로 append한다 
-	*/
-
 
 	struct list_elem* e;
 
@@ -322,6 +317,7 @@ thread_awake(int64_t ticks){ // 현재시간
 		{	
 			list_remove(e); // 슬립 큐에서 제거하고
 			thread_unblock(wakeThread); // unblock
+
 		}
 		else { // 현재 시간이 thread의 tick보다 작으면
 			update_next_tick_to_awake(ticks);
@@ -633,7 +629,7 @@ thread_launch (struct thread *th) {
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
-	ASSERT (thread_current()->status == THREAD_RUNNING);
+	ASSERT (thread_current()->status == THREAD_RUNNING); // 에러 발생
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
