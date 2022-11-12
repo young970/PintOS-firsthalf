@@ -4,11 +4,23 @@ Kernel command line: -q run priority-donate-chain
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  Kernel PANIC at ../../devices/timer.c:186 in real_time_sleep(): assertion `intr_get_level () == INTR_ON' failed.
-Call stack: 0x8004213400 0x800420d2ee 0x800420d105 0x800420d1ce 0x800420894b 0x8004208d69 0x800420cf44 0x80042060f7.
-The `backtrace' program can make call stacks useful.
-Read "Backtraces" in the "Debugging Tools" chapter
-of the Pintos documentation for more information.
-Timer: 1 ticks
-Thread: 0 idle ticks, 1 kernel ticks, 0 user ticks
-Console: 
+Calibrating timer...  143,564,800 loops/s.
+Boot complete.
+Executing 'priority-donate-chain':
+(priority-donate-chain) begin
+(priority-donate-chain) main got lock.
+(priority-donate-chain) main should have priority 3.  Actual priority: 0.
+(priority-donate-chain) main should have priority 6.  Actual priority: 0.
+(priority-donate-chain) main should have priority 9.  Actual priority: 0.
+(priority-donate-chain) main should have priority 12.  Actual priority: 0.
+(priority-donate-chain) main should have priority 15.  Actual priority: 0.
+(priority-donate-chain) main should have priority 18.  Actual priority: 0.
+(priority-donate-chain) main should have priority 21.  Actual priority: 0.
+(priority-donate-chain) main finishing with priority 0.
+(priority-donate-chain) end
+Execution of 'priority-donate-chain' complete.
+Timer: 28 ticks
+Thread: 0 idle ticks, 29 kernel ticks, 0 user ticks
+Console: 1079 characters output
+Keyboard: 0 keys pressed
+Powering off...

@@ -281,15 +281,19 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 		curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
 		curr->tick = ticks; // 1 tick 후 깨어남
 		list_push_back(&sleep_list, &(curr->elem));	
-
-		// do_schedule(THREAD_READY);
-
-		/* !!!! !!!!!!!!!!!!!!!!!!!!!!!!!
+	
+		/* 
 		awake 함수가 실행되어야 할 tick값을 update pg182 */
-		thread_awake(start); // 새로운 thread를 시작한다
+		// thread_awake(start); // 새로운 thread를 시작한다
 		
-		schedule();
+		schedule(); // disable interrupt까지 포함되어 있다
 		intr_set_level (old_level); // !!!! 위치를 어디???  cpu가 interrupt를 듣게한다
+	}
+	else{
+		enum intr_level old_level;
+		old_level = intr_disable();
+		thread_exit();
+		intr_set_level (old_level);
 	}
 
 	return;
@@ -308,7 +312,6 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 
 void
 thread_awake(int64_t ticks){ // 현재시간
-
 	struct list_elem* e;
 
 	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
@@ -389,7 +392,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
-	do_schedule (THREAD_DYING);
+	do_schedule (THREAD_DYING); 
 	NOT_REACHED ();
 }
 

@@ -4,11 +4,18 @@ Kernel command line: -q run alarm-simultaneous
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  Kernel PANIC at ../../devices/timer.c:186 in real_time_sleep(): assertion `intr_get_level () == INTR_ON' failed.
-Call stack: 0x8004213400 0x800420d2ee 0x800420d105 0x800420d1ce 0x800420894b 0x8004208d69 0x800420cf44 0x80042060f7.
+Calibrating timer...  157,081,600 loops/s.
+Boot complete.
+Executing 'alarm-simultaneous':
+(alarm-simultaneous) begin
+(alarm-simultaneous) Creating 3 threads to sleep 5 times each.
+(alarm-simultaneous) Each thread sleeps 10 ticks each time.
+(alarm-simultaneous) Within an iteration, all threads should wake up on the same tick.
+Kernel PANIC at ../../lib/kernel/list.c:242 in list_remove(): assertion `is_interior (elem)' failed.
+Call stack: 0x800421343e 0x8004213c94 0x8004206f26 0x800420d20c 0x8004208953 0x8004208d71 0x80042073e2.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 1 ticks
-Thread: 0 idle ticks, 1 kernel ticks, 0 user ticks
+Timer: 25 ticks
+Thread: 1 idle ticks, 24 kernel ticks, 0 user ticks
 Console: 

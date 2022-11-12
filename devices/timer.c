@@ -89,7 +89,7 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) { // 잘 시간 길이
+timer_sleep (int64_t ticks) { // 1틱이 들어오게 만듬
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
@@ -130,8 +130,14 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-	// timer_sleep(ticks); // 특정 길이의 시간을 주어야 하는데 현재 시간을 줌
-	real_time_sleep(); // 이를 통해 실제 자는 시간을 계산 후 내부에서 timer_sleep 호출
+	
+	if (get_next_tick_to_awake() <= ticks){
+		thread_awake(ticks);
+	}
+		
+
+	// timer_msleep(100); // 테스트!! 1tick
+
 	/* 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		구현: 

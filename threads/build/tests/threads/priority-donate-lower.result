@@ -1,12 +1,25 @@
 FAIL
-Kernel panic in run: PANIC at ../../devices/timer.c:186 in real_time_sleep(): assertion `intr_get_level () == INTR_ON' failed.
-Call stack: 0x8004213400 0x800420d2ee 0x800420d105 0x800420d1ce 0x800420894b 0x8004208d69 0x800420cf44 0x80042060f7
-Translation of call stack:
-0x0000008004213400: debug_panic (lib/kernel/debug.c:32)
-0x000000800420d2ee: real_time_sleep (devices/timer.c:187)
-0x000000800420d105: timer_msleep (devices/timer.c:108)
-0x000000800420d1ce: timer_interrupt (devices/timer.c:142)
-0x000000800420894b: intr_handler (threads/interrupt.c:352)
-0x0000008004208d69: intr_entry (threads/intr-stubs.o:?)
-0x000000800420cf44: timer_calibrate (devices/timer.c:59)
-0x00000080042060f7: main (threads/init.c:119)
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (priority-donate-lower) begin
+  (priority-donate-lower) Main thread should have priority 41.  Actual priority: 41.
+  (priority-donate-lower) Lowering base priority...
+  (priority-donate-lower) Main thread should have priority 41.  Actual priority: 41.
+  (priority-donate-lower) acquire: got the lock
+  (priority-donate-lower) acquire: done
+  (priority-donate-lower) acquire must already have finished.
+  (priority-donate-lower) Main thread should have priority 21.  Actual priority: 21.
+  (priority-donate-lower) end
+Differences in `diff -u' format:
+  (priority-donate-lower) begin
+- (priority-donate-lower) Main thread should have priority 41.  Actual priority: 41.
++ (priority-donate-lower) Main thread should have priority 41.  Actual priority: 31.
+  (priority-donate-lower) Lowering base priority...
+- (priority-donate-lower) Main thread should have priority 41.  Actual priority: 41.
+- (priority-donate-lower) acquire: got the lock
+- (priority-donate-lower) acquire: done
++ (priority-donate-lower) Main thread should have priority 41.  Actual priority: 21.
+  (priority-donate-lower) acquire must already have finished.
+  (priority-donate-lower) Main thread should have priority 21.  Actual priority: 21.
+  (priority-donate-lower) end
