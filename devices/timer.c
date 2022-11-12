@@ -130,17 +130,9 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-	int64_t temp = get_next_tick_to_awake();
+	
+	thread_awake(ticks);
 
-	if (temp == INT64_MAX)
-		thread_awake(ticks);
-
-	else if ( temp <= ticks){
-		thread_awake(temp);
-	}
-		
-
-	// timer_msleep(100); // 테스트!! 1tick
 
 	/* 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
