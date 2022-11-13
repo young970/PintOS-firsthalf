@@ -89,16 +89,17 @@ timer_elapsed (int64_t then) {
 
 /* Suspends execution for approximately TICKS timer ticks. */
 void
-timer_sleep (int64_t ticks) { // 1틱이 들어오게 만듬
+timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	thread_sleep(start + ticks); // 쓰레드가 깨어날 시간
-	/* 
-		!!!!!!!!!!!!!!!!!!!!!
-		여기서 thread_yield가 있었다, thread 함수 어딘가에 
-		schedule()를 넣어야하지 않는가, pg172참조 
-	*/
+	/* 기존의 busy writing을 유발하는 코드를 삭제 */
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+
+	/* 새로 구현한 thread를 sleep queue에 삽입하는 함수를 호출 */
+	thread_sleep(ticks); // ticks의 시간만큼 재움
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -113,7 +114,6 @@ timer_usleep (int64_t us) {
 	real_time_sleep (us, 1000 * 1000);
 }
 
-
 /* Suspends execution for approximately NS nanoseconds. */
 void
 timer_nsleep (int64_t ns) {
@@ -125,22 +125,18 @@ void
 timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-	
-	thread_awake(ticks);
 
-
-	/* 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		구현: 
-		매 tick마다 (sleep queue에서 깨어날 thread가 있는지 확인하여,
-		깨우는) 함수를 호출하도록 한다.
-	*/
+	int64_t temp=get_next_tick_to_awake();
+	if(ticks==temp)
+	{
+		thread_awake(temp);
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

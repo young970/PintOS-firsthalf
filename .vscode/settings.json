@@ -1,9 +1,6 @@
 {
     "files.associations": {
         "*.html": "html",
-        "interrupt.h": "c",
-        "timer.h": "c",
-        "debug.h": "c",
-        "thread.h": "c"
+        "interrupt.h": "c"
     }
 }
