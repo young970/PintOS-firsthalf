@@ -223,6 +223,7 @@ thread_create (const char *name, int priority,
 	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
 		우선순위 보다 높다면 CPU를 양보한다. */
 	test_max_priority();
+	// thread_yield();
 
 	return tid;
 }
@@ -269,12 +270,17 @@ thread_unblock (struct thread *t) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
+		// list_sort(&ready_list, &swap_priority, 0);
+		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
 		swap_priority(new_ele,new_ele->prev);
 	}
 	intr_set_level (old_level);
 }
 
 void swap_priority(struct list_elem* new_ele, struct list_elem* new_ele_prev){
+	ASSERT (new_ele);
+	ASSERT (new_ele_prev);
+	
 	struct list_elem* right = new_ele->next;
 	struct list_elem* left = new_ele_prev->prev;
 
@@ -344,17 +350,19 @@ void test_max_priority(void)
 {
 	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
 		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
-	ASSERT (0 != list_empty(&ready_list));
+	ASSERT (thread_current());
 
 	enum intr_level old_level = intr_disable(); // interrupt disable
 	struct thread* curr = thread_current(); // 현재 쓰레드 반환
-	struct list_elem* max_ele = list_begin(&sleep_list); 
+	struct list_elem* max_ele = list_begin(&ready_list); 
 	struct thread* max_thread = list_entry(max_ele, struct thread, elem);
 
 	if (!list_empty(&ready_list)){
 		if (curr->priority < max_thread->priority){
 			list_push_back(&sleep_list, &(curr->elem));	
 			do_schedule(THREAD_BLOCKED);
+			// thread_yield();
+			// schedule();
 	}}
 	
 	intr_set_level (old_level); // interrupt enable
@@ -442,6 +450,9 @@ thread_yield (void) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
+		// list_sort(&ready_list, &swap_priority,0);
+		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
+		
 		swap_priority(new_ele,new_ele->prev);
 	}
 
