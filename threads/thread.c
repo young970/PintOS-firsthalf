@@ -70,11 +70,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-/* Thread sleep과 awake 구현 */
-void thread_sleep(int64_t ticks);
-void thread_awake(int64_t ticks);
-void update_next_tick_to_awake(int64_t ticks);
-int64_t get_next_tick_to_awake(void);
+// /* Thread sleep과 awake 구현 */
+// void thread_sleep(int64_t ticks);
+// void thread_awake(int64_t ticks);
+// void update_next_tick_to_awake(int64_t ticks);
+// int64_t get_next_tick_to_awake(void);
 
 
 
@@ -227,6 +227,9 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
+		우선순위 보다 높다면 CPU를 양보한다. */
+
 	return tid;
 }
 
@@ -260,6 +263,9 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+	
+	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
+
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -333,6 +339,16 @@ int64_t get_next_tick_to_awake(void){
 	return next_tick_to_awake;
 }
 
+void test_max_priority(void)
+{
+	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
+		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
+}
+
+bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
+{
+	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+}
 
 /* Returns the name of the running thread. */
 const char *
@@ -391,6 +407,10 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
+
+	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때 
+		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
@@ -401,6 +421,8 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+
+	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 }
 
 /* Returns the current thread's priority. */
