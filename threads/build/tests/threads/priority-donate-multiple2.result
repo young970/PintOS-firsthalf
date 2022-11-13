@@ -1,0 +1,9 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/thread.c:347 in test_max_priority(): assertion `0 != list_empty(&ready_list)' failed.
+Call stack: 0x800421375e 0x8004207166 0x8004206c49 0x80042069e5 0x80042060df
+Translation of call stack:
+0x000000800421375e: debug_panic (lib/kernel/debug.c:32)
+0x0000008004207166: test_max_priority (threads/thread.c:349)
+0x0000008004206c49: thread_create (threads/thread.c:227)
+0x00000080042069e5: thread_start (threads/thread.c:143)
+0x00000080042060df: main (threads/init.c:106)
