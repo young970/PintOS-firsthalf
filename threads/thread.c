@@ -275,24 +275,23 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 	int64_t start = timer_ticks(); // 현재 시간
 	enum intr_level old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
 	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
-		enum intr_level old_level;
 
-		curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
 		curr->tick = ticks; // 1 tick 후 깨어남
 		list_push_back(&sleep_list, &(curr->elem));	
+		// curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
+		// schedule(); // disable interrupt까지 포함되어 있다
+		do_schedule(THREAD_BLOCKED);
 	
 		/* 
 		awake 함수가 실행되어야 할 tick값을 update pg182 */
 		// thread_awake(start); // 새로운 thread를 시작한다
 		update_next_tick_to_awake(ticks);
-		schedule(); // disable interrupt까지 포함되어 있다
-		intr_set_level (old_level); // !!!! 위치를 어디???  cpu가 interrupt를 듣게한다
+		
 	}
 	else{
-		enum intr_level old_level;
 		thread_exit();
-		intr_set_level (old_level);
 	}
+	intr_set_level (old_level);
 	/* 
 		구현:
 			-현재 스레드가 idle 스레드가 아닐경우
@@ -308,12 +307,14 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 
 void
 thread_awake(int64_t ticks){ // 현재시간
+
 	struct list_elem* e;
 
 	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
 		struct thread* wakeThread = list_entry(e, struct thread, elem);
 		if (wakeThread->tick <= ticks) // 현재 시간이 thread의 tick보다 크거나 같다면
 		{	
+			next_tick_to_awake = INT64_MAX; // 깨우면서 최대값 설정
 			list_remove(e); // 슬립 큐에서 제거하고
 			thread_unblock(wakeThread); // unblock
 
@@ -328,19 +329,9 @@ thread_awake(int64_t ticks){ // 현재시간
 	/* 작다면 update_next_tick_to_awake()를 호출한다 */
 }
 
-void update_next_tick_to_awake(int64_t ticks){ // 현재 시간
+void update_next_tick_to_awake(int64_t ticks){ // thread의 tick값
 	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
-	struct list_elem* e;
-
-	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
-		struct thread* wakeThread = list_entry(e, struct thread, elem);
-		if (e == list_begin(&sleep_list))
-			next_tick_to_awake = wakeThread->tick;
-		
-		else if (wakeThread->tick < next_tick_to_awake)
-			next_tick_to_awake = wakeThread->tick;
-		
-	}	
+	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;
 }
 
 int64_t get_next_tick_to_awake(void){
@@ -631,7 +622,7 @@ thread_launch (struct thread *th) {
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
-	ASSERT (thread_current()->status == THREAD_RUNNING); // 에러 발생
+	ASSERT (thread_current()->status == THREAD_RUNNING); 
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);

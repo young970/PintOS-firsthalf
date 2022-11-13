@@ -1,0 +1,23 @@
+Kernel command line: -q run alarm-single
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  104,755,200 loops/s.
+Boot complete.
+Executing 'alarm-single':
+(alarm-single) begin
+(alarm-single) Creating 5 threads to sleep 1 times each.
+(alarm-single) Thread 0 sleeps 10 ticks each time,
+(alarm-single) thread 1 sleeps 20 ticks each time, and so on.
+(alarm-single) If successful, product of iteration count and
+(alarm-single) sleep duration will appear in nondescending order.
+Kernel PANIC at ../../lib/kernel/list.c:242 in list_remove(): assertion `is_interior (elem)' failed.
+Call stack: 0x80042133b3 0x8004213c09 0x8004206f35 0x800420d181 0x80042088ee 0x8004208d0c 0x800420737d.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 132 ticks
+Thread: 110 idle ticks, 22 kernel ticks, 0 user ticks
+Console: 1

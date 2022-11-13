@@ -113,6 +113,7 @@ timer_usleep (int64_t us) {
 	real_time_sleep (us, 1000 * 1000);
 }
 
+
 /* Suspends execution for approximately NS nanoseconds. */
 void
 timer_nsleep (int64_t ns) {
@@ -137,8 +138,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	/* 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		구현: 
-		매 tick마다 sleep queue에서 깨어날 thread가 있는지 확인하여,
-		깨우는 함수를 호출하도록 한다.
+		매 tick마다 (sleep queue에서 깨어날 thread가 있는지 확인하여,
+		깨우는) 함수를 호출하도록 한다.
 	*/
 }
 
