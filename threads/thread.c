@@ -70,14 +70,6 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-// /* Thread sleep과 awake 구현 */
-// void thread_sleep(int64_t ticks);
-// void thread_awake(int64_t ticks);
-// void update_next_tick_to_awake(int64_t ticks);
-// int64_t get_next_tick_to_awake(void);
-
-
-
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -229,7 +221,7 @@ thread_create (const char *name, int priority,
 
 	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
 		우선순위 보다 높다면 CPU를 양보한다. */
-
+	
 	return tid;
 }
 
@@ -433,15 +425,14 @@ thread_yield (void) {
 	intr_set_level (old_level);
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
-	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 }
 
-/* Returns the current thread's priority. */
+/* 현재 thread의 우선순위를 반환 */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;

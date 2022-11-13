@@ -131,16 +131,13 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-<<<<<<< HEAD
 	
 	if (ticks >= get_next_tick_to_awake())
 		thread_awake(ticks);
 
-
-=======
 	// timer_sleep(ticks); // 특정 길이의 시간을 주어야 하는데 현재 시간을 줌
 	// real_time_sleep(); // 이를 통해 실제 자는 시간을 계산 후 내부에서 timer_sleep 호출
->>>>>>> 7f5f447abc715b8c3a1f00facfe6f09508696049
+
 	/* 
 		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		구현: 
