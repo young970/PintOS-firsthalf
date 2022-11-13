@@ -445,7 +445,7 @@ thread_yield (void) {
 		우선순위 순서로 정렬되어 삽입 되도록 수정 */
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
-		
+
 	struct list_elem* new_ele = &(curr->elem);
 
 	while (cmp_priority(new_ele, new_ele->prev,0)){
@@ -464,6 +464,8 @@ thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
 	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
+	test_max_priority();
+
 }
 
 /* Returns the current thread's priority. */
@@ -714,7 +716,6 @@ schedule (void) {
 #endif
 
 	if (curr != next) {
-		struct thread* a = switch_threads(curr, next);
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
