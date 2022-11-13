@@ -9,6 +9,12 @@
 #include "vm/vm.h"
 #endif
 
+/* Alarm 함수 선언 */
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+void update_next_tick_to_awake(int64_t ticks);
+int64_t get_next_tick_to_awake(void);
+
 
 /* States in a thread's life cycle. */
 enum thread_status {
