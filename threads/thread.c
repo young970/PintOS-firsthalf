@@ -275,23 +275,31 @@ thread_unblock (struct thread *t) {
 	ctrl+f => 구현 파트#################################################
 */
 
+// idle일때는 다른 곳에서 체크하는 걸로 결론
 void
 thread_sleep(int64_t ticks){ // 깨울 시간
 	struct thread* curr = thread_current();
-	ASSERT(!intr_context());
-	enum intr_level old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
-
-	curr->tick = ticks; //  tick 후 깨어남
-
 	int64_t start = timer_ticks(); // 현재 시간
+
 	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
+		enum intr_level old_level;
+
+		old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
+		curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
+		curr->tick = ticks; // 1 tick 후 깨어남
 		list_push_back(&sleep_list, &(curr->elem));	
+
+		// do_schedule(THREAD_READY);
+
+		/* !!!! !!!!!!!!!!!!!!!!!!!!!!!!!
+		awake 함수가 실행되어야 할 tick값을 update pg182 */
+		thread_awake(start); // 새로운 thread를 시작한다
+		
+		schedule();
+		intr_set_level (old_level); // !!!! 위치를 어디???  cpu가 interrupt를 듣게한다
 	}
 
-	update_next_tick_to_awake(ticks); 	
-	do_schedule(THREAD_BLOCKED);
-
-	intr_set_level (old_level);
+	return;
 	/* 
 		구현:
 			-현재 스레드가 idle 스레드가 아닐경우
@@ -308,35 +316,43 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 void
 thread_awake(int64_t ticks){ // 현재시간
 
-	next_tick_to_awake = INT64_MAX; // 깨우면서 최대값 설정
 	struct list_elem* e;
 
-	for (e= list_begin(&sleep_list); e != list_end(&sleep_list);){
+	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
 		struct thread* wakeThread = list_entry(e, struct thread, elem);
 		if (wakeThread->tick <= ticks) // 현재 시간이 thread의 tick보다 크거나 같다면
 		{	
-			e = list_remove(e); // 슬립 큐에서 제거하고 next를 위해 변수 저장
+			list_remove(e); // 슬립 큐에서 제거하고
 			thread_unblock(wakeThread); // unblock
 
 		}
 		else { // 현재 시간이 thread의 tick보다 작으면
-			update_next_tick_to_awake(ticks); // 현재 시간
-			e = list_next(e);
+			update_next_tick_to_awake(ticks);
 		}
 	}
 
 	/* sleep list의 모든 entry를 순회하며 다음과 같은 작업을 수행한다 */
 	/* 현재 tick이 깨워야 할 tick 보다 크거나 같다면 슬립 큐에서 제거하고 unblock 한다 */
 	/* 작다면 update_next_tick_to_awake()를 호출한다 */
+	/* sleep queue에서 깨워야할 쓰레드를 깨움 */
+	/* wakeup_tick값이 ticks보다 작거나 같은 쓰레드를 깨움 */
+	/* 현재 대기중인 쓰레들의 wakeup_tick변수 중 가장 작은 값을 next_tick_to_awake 전역 변수에 저장 */
 }
 
-void update_next_tick_to_awake(int64_t ticks){ // thread의 tick값
+void update_next_tick_to_awake(int64_t ticks){ // 현재 시간
 	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
-	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;
+	struct list_elem* e;
+
+	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
+		struct thread* wakeThread = list_entry(e, struct thread, elem);
+		if (wakeThread->tick - ticks < next_tick_to_awake - ticks){ // Thread의 tick - 현재시간 < 다음 최소 - 현재 시간
+			next_tick_to_awake = wakeThread->tick; 
+		}
+	}	
 }
 
 int64_t get_next_tick_to_awake(void){
-	return next_tick_to_awake;
+	/* next_tick_to_awake을 반환한다 */
 }
 
 void test_max_priority(void)
@@ -673,6 +689,7 @@ schedule (void) {
 #endif
 
 	if (curr != next) {
+		struct thread* a = switch_threads(curr, next);
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
