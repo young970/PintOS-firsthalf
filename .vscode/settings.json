@@ -2,7 +2,6 @@
     "files.associations": {
         "*.html": "html",
         "interrupt.h": "c",
-        "list.h": "c",
-        "thread.h": "c"
+        "list.h": "c"
     }
 }
