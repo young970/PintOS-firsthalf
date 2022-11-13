@@ -70,11 +70,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-/* Thread sleep과 awake 구현 */
-void thread_sleep(int64_t ticks);
-void thread_awake(int64_t ticks);
-void update_next_tick_to_awake(int64_t ticks);
-int64_t get_next_tick_to_awake(void);
+// /* Thread sleep과 awake 구현 */
+// void thread_sleep(int64_t ticks);
+// void thread_awake(int64_t ticks);
+// void update_next_tick_to_awake(int64_t ticks);
+// int64_t get_next_tick_to_awake(void);
 
 
 
@@ -98,13 +98,10 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
    was careful to put the bottom of the stack at a page boundary.
-
    Also initializes the run queue and the tid lock.
-
    After calling this function, be sure to initialize the page
    allocator before trying to create any threads with
    thread_create().
-
    It is not safe to call thread_current() until this function
    finishes. */
 
@@ -185,14 +182,12 @@ thread_print_stats (void) {
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
    for the new thread, or TID_ERROR if creation fails.
-
    If thread_start() has been called, then the new thread may be
    scheduled before thread_create() returns.  It could even exit
    before thread_create() returns.  Contrariwise, the original
    thread may run for any amount of time before the new thread is
    scheduled.  Use a semaphore or some other form of
    synchronization if you need to ensure ordering.
-
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
@@ -227,12 +222,14 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
+		우선순위 보다 높다면 CPU를 양보한다. */
+
 	return tid;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
-
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
@@ -247,7 +244,6 @@ thread_block (void) {
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
-
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
@@ -260,6 +256,9 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+	
+	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
+
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
@@ -274,25 +273,26 @@ void
 thread_sleep(int64_t ticks){ // 깨울 시간
 	struct thread* curr = thread_current();
 	int64_t start = timer_ticks(); // 현재 시간
-	enum intr_level old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
-	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
 
+	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
+		enum intr_level old_level;
+
+		old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
+		curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
 		curr->tick = ticks; // 1 tick 후 깨어남
 		list_push_back(&sleep_list, &(curr->elem));	
-		// curr->status = THREAD_BLOCKED; // block 처리를한다. 이후 이 thread는 unblock해줘야한다  
-		// schedule(); // disable interrupt까지 포함되어 있다
-		do_schedule(THREAD_BLOCKED);
-	
-		/* 
+
+		// do_schedule(THREAD_READY);
+
+		/* !!!! !!!!!!!!!!!!!!!!!!!!!!!!!
 		awake 함수가 실행되어야 할 tick값을 update pg182 */
-		// thread_awake(start); // 새로운 thread를 시작한다
-		update_next_tick_to_awake(ticks);
+		thread_awake(start); // 새로운 thread를 시작한다
 		
+		schedule();
+		intr_set_level (old_level); // !!!! 위치를 어디???  cpu가 interrupt를 듣게한다
 	}
-	else{
-		thread_exit();
-	}
-	intr_set_level (old_level);
+
+	return;
 	/* 
 		구현:
 			-현재 스레드가 idle 스레드가 아닐경우
@@ -309,20 +309,18 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 void
 thread_awake(int64_t ticks){ // 현재시간
 
-	next_tick_to_awake = INT64_MAX; // 깨우면서 최대값 설정
 	struct list_elem* e;
 
-	for (e= list_begin(&sleep_list); e != list_end(&sleep_list);){
+	for (e= list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e)){
 		struct thread* wakeThread = list_entry(e, struct thread, elem);
 		if (wakeThread->tick <= ticks) // 현재 시간이 thread의 tick보다 크거나 같다면
 		{	
-			next_tick_to_awake = INT64_MAX; // 깨우면서 최대값 설정
 			list_remove(e); // 슬립 큐에서 제거하고
 			thread_unblock(wakeThread); // unblock
 
 		}
 		else { // 현재 시간이 thread의 tick보다 작으면
-			update_next_tick_to_awake(ticks); // 현재 시간
+			update_next_tick_to_awake(ticks);
 		}
 	}
 
@@ -350,6 +348,16 @@ int64_t get_next_tick_to_awake(void){
 	/* next_tick_to_awake을 반환한다 */
 }
 
+void test_max_priority(void)
+{
+	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
+		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
+}
+
+bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
+{
+	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+}
 
 /* Returns the name of the running thread. */
 const char *
@@ -408,6 +416,10 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
+
+	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때 
+		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
@@ -418,6 +430,8 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+
+	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 }
 
 /* Returns the current thread's priority. */
@@ -454,7 +468,6 @@ thread_get_recent_cpu (void) {
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
-
    The idle thread is initially put on the ready list by
    thread_start().  It will be scheduled once initially, at which
    point it initializes idle_thread, "up"s the semaphore passed
@@ -475,7 +488,6 @@ idle (void *idle_started_ UNUSED) {
 		thread_block ();
 
 		/* Re-enable interrupts and wait for the next one.
-
 		   The `sti' instruction disables interrupts until the
 		   completion of the next instruction, so these two
 		   instructions are executed atomically.  This atomicity is
@@ -483,7 +495,6 @@ idle (void *idle_started_ UNUSED) {
 		   between re-enabling interrupts and waiting for the next
 		   one to occur, wasting as much as one clock tick worth of
 		   time.
-
 		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
 		   7.11.1 "HLT Instruction". */
 		asm volatile ("sti; hlt" : : : "memory");
@@ -560,11 +571,9 @@ do_iret (struct intr_frame *tf) {
 
 /* Switching the thread by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
-
    At this function's invocation, we just switched from thread
    PREV, the new thread is already running, and interrupts are
    still disabled.
-
    It's not safe to call printf() until the thread switch is
    complete.  In practice that means that printf()s should be
    added at the end of the function. */
@@ -646,7 +655,6 @@ do_schedule(int status) {
 
 /* 
 	현재 실행 중인 쓰레드와 다음 쓰레드의 교환
-
 */
 static void
 schedule (void) {

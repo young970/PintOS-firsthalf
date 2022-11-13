@@ -164,7 +164,6 @@ too_many_loops (unsigned loops) {
 
 /* Iterates through a simple loop LOOPS times, for implementing
    brief delays.
-
    Marked NO_INLINE because code alignment can significantly
    affect timings, so that if this function was inlined
    differently in different places the results would be difficult
@@ -179,7 +178,6 @@ busy_wait (int64_t loops) {
 static void
 real_time_sleep (int64_t num, int32_t denom) {
 	/* Convert NUM/DENOM seconds into timer ticks, rounding down.
-
 	   (NUM / DENOM) s
 	   ---------------------- = NUM * TIMER_FREQ / DENOM ticks.
 	   1 s / TIMER_FREQ ticks
