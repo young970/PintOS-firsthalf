@@ -222,8 +222,13 @@ thread_create (const char *name, int priority,
 
 	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
 		우선순위 보다 높다면 CPU를 양보한다. */
+	/* 갈까? */
 	test_max_priority();
-	// thread_yield();
+
+	/* 성심당 가자 */
+	// struct thread* curr = thread_current();
+	// if (cmp_priority(&t->elem, &curr->elem, NULL))
+	// 	thread_yield();
 
 	return tid;
 }
@@ -261,6 +266,7 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	
 	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
+	/* 갈끼? */
 
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
@@ -270,10 +276,13 @@ thread_unblock (struct thread *t) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
-		// list_sort(&ready_list, &swap_priority, 0);
-		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
 		swap_priority(new_ele,new_ele->prev);
 	}
+
+	// 유성 순대군 가자
+	// list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	// t->status = THREAD_READY;
+
 	intr_set_level (old_level);
 }
 
@@ -350,9 +359,8 @@ void test_max_priority(void)
 {
 	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
 		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
-	ASSERT (thread_current());
+	/* 갈까? */
 
-	enum intr_level old_level = intr_disable(); // interrupt disable
 	struct thread* curr = thread_current(); // 현재 쓰레드 반환
 	struct list_elem* max_ele = list_begin(&ready_list); 
 	struct thread* max_thread = list_entry(max_ele, struct thread, elem);
@@ -361,19 +369,26 @@ void test_max_priority(void)
 		if (curr->priority < max_thread->priority){
 			list_push_back(&sleep_list, &(curr->elem));	
 			do_schedule(THREAD_BLOCKED);
-			// thread_yield();
-			// schedule();
 	}}
 	
-	intr_set_level (old_level); // interrupt enable
+	/* 어니언 키친 가자 */
+	// if (list_empty(&ready_list)) {
+	// 	return;
+	// }
+
+	// int run_priority = thread_current()->priority;
+	// struct list_elem *e = list_begin(&ready_list);
+	// struct thread *t = list_entry(e, struct thread, elem);
+
+	// if (t->priority > run_priority) {
+	// 	thread_yield();
+	// }
 	return;
 }
 
 bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
 {
 	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
-	ASSERT (a_ != NULL);
-	ASSERT (b_ != NULL);
 	
 	struct thread* a_thread = list_entry(a_, struct thread, elem);
 	struct thread* b_thread = list_entry(b_, struct thread, elem);
@@ -442,18 +457,20 @@ thread_yield (void) {
 
 	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때 
 		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+	/* 갈까? */
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 
-	struct list_elem* new_ele = &(curr->elem);
+		struct list_elem* new_ele = &(curr->elem);
 
-	while (cmp_priority(new_ele, new_ele->prev,0)){
-		if (new_ele->prev->prev == NULL)
-			break;
-		// list_sort(&ready_list, &swap_priority,0);
-		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
-		
-		swap_priority(new_ele,new_ele->prev);
+		while (cmp_priority(new_ele, new_ele->prev,0)){
+			if (new_ele->prev->prev == NULL)
+				break;
+			
+			swap_priority(new_ele,new_ele->prev);
+
+		/* 학식 가즈아 */
+		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
 	}
 
 	do_schedule (THREAD_READY);
