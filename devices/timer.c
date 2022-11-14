@@ -94,11 +94,7 @@ timer_sleep (int64_t ticks) { // 1틱이 들어오게 만듬
 
 	ASSERT (intr_get_level () == INTR_ON);
 	thread_sleep(start + ticks); // 쓰레드가 깨어날 시간
-	/* 
-		!!!!!!!!!!!!!!!!!!!!!
-		여기서 thread_yield가 있었다, thread 함수 어딘가에 
-		schedule()를 넣어야하지 않는가, pg172참조 
-	*/
+	
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -131,22 +127,10 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
-<<<<<<< HEAD
-	
+
 	if (ticks >= get_next_tick_to_awake())
 		thread_awake(ticks);
 
-
-=======
-	// timer_sleep(ticks); // 특정 길이의 시간을 주어야 하는데 현재 시간을 줌
-	// real_time_sleep(); // 이를 통해 실제 자는 시간을 계산 후 내부에서 timer_sleep 호출
->>>>>>> 7f5f447abc715b8c3a1f00facfe6f09508696049
-	/* 
-		!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		구현: 
-		매 tick마다 (sleep queue에서 깨어날 thread가 있는지 확인하여,
-		깨우는) 함수를 호출하도록 한다.
-	*/
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
