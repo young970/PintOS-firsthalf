@@ -4,16 +4,20 @@
 #include <list.h>
 #include <stdbool.h>
 
+/* Priority Scheduling - Synchronization 함수 선언 */
+bool cmp_sem_priority(const struct list_elem *a,
+						const struct list_elem *b, void *aux);
+
 /* A counting semaphore. */
 struct semaphore {
 	unsigned value;             /* Current value. */
 	struct list waiters;        /* List of waiting threads. */
 };
 
-void sema_init (struct semaphore *, unsigned value);
-void sema_down (struct semaphore *);
+void sema_init (struct semaphore *, unsigned value); // semaphore를 주어진 value로 초기화
+void sema_down (struct semaphore *); // semaphore를 요청하고 획득했을 때 value를 1 낮춤
 bool sema_try_down (struct semaphore *);
-void sema_up (struct semaphore *);
+void sema_up (struct semaphore *); // semaphore를 반환하고 value를 1 높임
 void sema_self_test (void);
 
 /* Lock. */
@@ -22,10 +26,10 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 
-void lock_init (struct lock *);
-void lock_acquire (struct lock *);
+void lock_init (struct lock *); // lock 자료구조를 초기화
+void lock_acquire (struct lock *); // lock을 요청청
 bool lock_try_acquire (struct lock *);
-void lock_release (struct lock *);
+void lock_release (struct lock *); // lock을 반환
 bool lock_held_by_current_thread (const struct lock *);
 
 /* Condition variable. */
@@ -33,10 +37,10 @@ struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
 
-void cond_init (struct condition *);
-void cond_wait (struct condition *, struct lock *);
-void cond_signal (struct condition *, struct lock *);
-void cond_broadcast (struct condition *, struct lock *);
+void cond_init (struct condition *); // condition variable 자료구조를 초기화
+void cond_wait (struct condition *, struct lock *); // condition variable을 통해 signal이 오는지 기다림
+void cond_signal (struct condition *, struct lock *); // condition variable에서 기다리는 가장 높은 우선순위의 스레드에 signal을 보냄
+void cond_broadcast (struct condition *, struct lock *); // condition variable에서 기다리는 모든 스레드에 signal을 보냄
 
 /* Optimization barrier.
  *
