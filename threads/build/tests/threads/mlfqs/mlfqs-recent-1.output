@@ -1,0 +1,11 @@
+Kernel command line: -q -mlfqs run mlfqs-recent-1
+Kernel PANIC at ../../lib/kernel/list.c:270 in list_front(): assertion `!list_empty (list)' failed.
+Call stack: 0x8004213912 0x8004214274 0x80042141b6 0x8004209ee0 0x800420a3ad 0x8004207e2e 0x800420698e 0x8004206068.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 0 ticks
+Thread: 0 idle ticks, 0 kernel ticks, 0 user ticks
+Console: 487 characters output
+Keyboard: 0 keys pressed
+Powering off...
