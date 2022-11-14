@@ -272,7 +272,7 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 
 	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
-
+	/* 갈까? */
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 
@@ -281,8 +281,6 @@ thread_unblock (struct thread *t) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
-		// list_sort(&ready_list, &swap_priority, 0);
-		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
 		swap_priority(new_ele,new_ele->prev);
 	}
 	// 유성 순대군 가자
@@ -468,6 +466,7 @@ thread_yield (void) {
 
 	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때
 		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+	/* 갈까? */
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 
@@ -480,6 +479,8 @@ thread_yield (void) {
 		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
 
 		swap_priority(new_ele,new_ele->prev);
+		/* 학식 가즈아 */
+		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);s
 	}
 
 	do_schedule (THREAD_READY);
