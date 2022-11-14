@@ -131,6 +131,10 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	if (ticks >= get_next_tick_to_awake())
 		thread_awake(ticks);
 
+
+	// timer_sleep(ticks); // 특정 길이의 시간을 주어야 하는데 현재 시간을 줌
+	// real_time_sleep(); // 이를 통해 실제 자는 시간을 계산 후 내부에서 timer_sleep 호출
+	
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -153,7 +157,6 @@ too_many_loops (unsigned loops) {
 
 /* Iterates through a simple loop LOOPS times, for implementing
    brief delays.
-
    Marked NO_INLINE because code alignment can significantly
    affect timings, so that if this function was inlined
    differently in different places the results would be difficult
@@ -168,7 +171,6 @@ busy_wait (int64_t loops) {
 static void
 real_time_sleep (int64_t num, int32_t denom) {
 	/* Convert NUM/DENOM seconds into timer ticks, rounding down.
-
 	   (NUM / DENOM) s
 	   ---------------------- = NUM * TIMER_FREQ / DENOM ticks.
 	   1 s / TIMER_FREQ ticks
