@@ -480,7 +480,7 @@ thread_yield (void) {
 
 		swap_priority(new_ele,new_ele->prev);
 		/* 학식 가즈아 */
-		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);s
+		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
 	}
 
 	do_schedule (THREAD_READY);
