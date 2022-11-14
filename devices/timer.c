@@ -94,11 +94,7 @@ timer_sleep (int64_t ticks) { // 1틱이 들어오게 만듬
 
 	ASSERT (intr_get_level () == INTR_ON);
 	thread_sleep(start + ticks); // 쓰레드가 깨어날 시간
-	/* 
-		!!!!!!!!!!!!!!!!!!!!!
-		여기서 thread_yield가 있었다, thread 함수 어딘가에 
-		schedule()를 넣어야하지 않는가, pg172참조 
-	*/
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
