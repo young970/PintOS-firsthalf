@@ -225,6 +225,9 @@ thread_create (const char *name, int priority,
 	/* 갈까? */
 	test_max_priority();
 
+	if (cmp_priority(&t->elem, list_back(&ready_list),0)){
+		1;
+	}
 	/* 성심당 가자 */
 	// struct thread* curr = thread_current();
 	// if (cmp_priority(&t->elem, &curr->elem, NULL))

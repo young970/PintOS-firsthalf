@@ -71,6 +71,8 @@ static void schedule (void);
 static tid_t allocate_tid (void);
 
 
+
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -470,17 +472,16 @@ thread_yield (void) {
 	intr_set_level (old_level);
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
 	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
 	test_max_priority();
-
 }
 
-/* Returns the current thread's priority. */
+/* 현재 thread의 우선순위를 반환 */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
