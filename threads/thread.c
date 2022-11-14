@@ -485,6 +485,7 @@ thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
 	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
+	test_max_priority();
 }
 
 /* 현재 thread의 우선순위를 반환 */
