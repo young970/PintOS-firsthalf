@@ -65,6 +65,9 @@ sema_down (struct semaphore *sema) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
+
+	/* waiters 리스트 삽입 시, 우선순위대로 삽입되도록 수정 */
+
 	while (sema->value == 0) {
 		list_push_back (&sema->waiters, &thread_current ()->elem);
 		/* Semaphore를 얻고 waiters 리스트 삽입 시, 우선순위대로 삽입되도록 수정 */
@@ -111,16 +114,13 @@ sema_up (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters))
-	{
-		/* 스레드가 waiters list에 있는 동안 우선순위가 변경 되었을 
-			경우를 고려 하여 waiters list를 우선순위로 정렬한다. */
+		/* 스레드가 waiters list에 있는 동안 우선순위가 변경 되었을
+			경우를 고려하여 waiters list를 우선순위로 정렬 한다. */
+
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
-	}
 	sema->value++;
-
 	/* priority preemption 코드 추가 */
-
 	intr_set_level (old_level);
 }
 
@@ -289,8 +289,8 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	/* condition variable의 waiters list에 우선순위 순서로 삽입되도록 수정 */
-
+	/* condition variable의 waiters list에 우선순위 순서로
+		삽입되도록 수정 */
 	sema_init (&waiter.semaphore, 0);
 	list_push_back (&cond->waiters, &waiter.elem);
 	lock_release (lock);
@@ -316,6 +316,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	{
 		/* condition variable의 waiters list를 우선순위로 재 정렬
 			(대기 중에 우선순위가 변경되었을 가능성이 있음) */
+
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 	}

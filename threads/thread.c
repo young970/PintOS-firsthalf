@@ -270,10 +270,6 @@ thread_unblock (struct thread *t) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
-
-		// list_sort(&ready_list, &swap_priority, 0);
-		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
-
 		swap_priority(new_ele,new_ele->prev);
 	}
 	// 유성 순대군 가자

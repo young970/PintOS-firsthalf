@@ -1,12 +1,10 @@
 #ifndef THREADS_SYNCH_H
 #define THREADS_SYNCH_H
 
+#include <debug.h>
 #include <list.h>
 #include <stdbool.h>
 
-/* Priority Scheduling - Synchronization 함수 선언 */
-bool cmp_sem_priority(const struct list_elem *a,
-						const struct list_elem *b, void *aux);
 
 /* A counting semaphore. */
 struct semaphore {
@@ -19,6 +17,9 @@ void sema_down (struct semaphore *); // semaphore를 요청하고 획득했을 �
 bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *); // semaphore를 반환하고 value를 1 높임
 void sema_self_test (void);
+bool cmp_sem_priority(const struct list_elem* a,
+						const struct list_elem* b,
+						void *aux UNUSED);
 
 /* Lock. */
 struct lock {
