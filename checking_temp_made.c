@@ -32,6 +32,36 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+/* Lock. */
+struct lock {
+	struct thread *holder;      /* Thread holding lock (for debugging). */
+	struct semaphore semaphore; /* Binary semaphore controlling access. */
+};
+
+/* Condition variable. */
+struct condition {
+	struct list waiters;        /* List of waiting threads. */
+};
+/* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+struct semaphore {
+	unsigned value;             /* Current value. */
+	struct list waiters;        /* List of waiting threads. */
+};
+/* List element. */
+struct list_elem {
+	struct list_elem *prev;     /* Previous list element. */
+	struct list_elem *next;     /* Next list element. */
+};
+/* List. */
+struct list {
+	struct list_elem head;      /* List head. */
+	struct list_elem tail;      /* List tail. */
+};
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
