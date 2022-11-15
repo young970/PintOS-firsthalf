@@ -218,7 +218,7 @@ lock_acquire (struct lock *lock) {
 	// donation을 받은 스레드의 thread 구조체를 list로 관리한다
 		list_push_back(&lock->semaphore.waiters, &curr);
 	/* priority donation 수행하기 위해 donation_priority() 함수 호출 */
-		donation_priority();
+		donate_priority();
 	}
 	sema_down (&lock->semaphore);
 	thread_current()->wait_on_lock = NULL;
