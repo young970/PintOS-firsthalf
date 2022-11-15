@@ -32,6 +32,25 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+struct thread {
+	/* Owned by thread.c. */
+	int init_priority; // donation 이후 우선순위를 초기화하기 위해 초기값 저장
+	struct lock* wait_on_lock; // 해당 스레드가 대기 하고 있는 lock자료구조의 주소를 저장
+	struct list donations; // mulitple donation을 고려하기 위해 사용
+	struct list_elem donation_elem; // multiple donation을 고려하기 위해 사용
+	int64_t tick;
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
+	char name[16];                      /* Name (for debugging purposes). */
+	int priority;                       /* Priority. */
+
+	/* Shared between thread.c and synch.c. */
+	struct list_elem elem;              /* List element. */
+	/* Owned by thread.c. */
+	struct intr_frame tf;               /* Information for switching */
+	unsigned magic;                     /* Detects stack overflow. */
+};
+
 /* Lock. */
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */

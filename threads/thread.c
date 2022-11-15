@@ -496,12 +496,13 @@ thread_set_priority (int new_priority) {
 
 	/* donation을 고려하여 thread_set_priority() 함수를 수정한다 */
 	
-	/*
-	refresh_priority()함수를 사용하여 우선순위를 변경으로 인한
-	donation 관련 정보를 갱신한다.
-	donation_priority(), test_mex_priority()함수를 적절히
+
+	// refresh_priority()함수를 사용하여 우선순위를 변경으로 인한 donation 관련 정보를 갱신한다.
+	refresh_priority();
+	/* donation_priority(), test_mex_priority()함수를 적절히
 	사용하여 priority donation을 수행하고 스케줄링 한다.
 	*/
+	donate_priority();
 	test_max_priority();
 
 }
@@ -596,6 +597,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (name != NULL);
 
 	/* Priority donation관련 자료구조 초기화 */
+	t->init_priority = priority;
 
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
