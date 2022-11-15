@@ -207,8 +207,16 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	/* 해당 lock의 holder가 존재 한다면 아래 작업을 수행한다 */
+	/* 현재 스레드의 wait_on_lock 변수에 획득 하기를 기다리는 lock의 주소를 저장 */
+	/* multiple donation을 고려하기 위해 이전상태의 우선순위를 기억,
+		donation을 받은 스레드의 thread 구조체를 list로 관리한다 */
+	/* priority donation 수행하기 위해 donation_priority() 함수 호출 */
+
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
+
+	/* lock을 획득 한 후 lock holder를 갱신하다 */
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -242,6 +250,10 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
+
+	/* remove_with_lock() 함수추가 */
+	/* refresh_priority() 함수추가 */
+
 	sema_up (&lock->semaphore);
 }
 
