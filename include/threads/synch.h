@@ -23,7 +23,6 @@ bool cmp_sem_priority(const struct list_elem* a,
 
 
 
-
 /* Lock. */
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */
