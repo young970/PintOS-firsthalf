@@ -1,3 +1,491 @@
+/* This file is derived from source code for the Nachos
+   instructional operating system.  The Nachos copyright notice
+   is reproduced in full below. */
+
+/* Copyright (c) 1992-1996 The Regents of the University of California.
+   All rights reserved.
+
+   Permission to use, copy, modify, and distribute this software
+   and its documentation for any purpose, without fee, and
+   without written agreement is hereby granted, provided that the
+   above copyright notice and the following two paragraphs appear
+   in all copies of this software.
+
+   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO
+   ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR
+   CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE
+   AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA
+   HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+   WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+   PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
+   BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+   PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+   MODIFICATIONS.
+   */
+
+#include "threads/synch.h"
+#include <stdio.h>
+#include <string.h>
+#include "threads/interrupt.h"
+#include "threads/thread.h"
+
+/* Lock. */
+struct lock {
+	struct thread *holder;      /* Thread holding lock (for debugging). */
+	struct semaphore semaphore; /* Binary semaphore controlling access. */
+};
+
+/* Condition variable. */
+struct condition {
+	struct list waiters;        /* List of waiting threads. */
+};
+/* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+struct semaphore {
+	unsigned value;             /* Current value. */
+	struct list waiters;        /* List of waiting threads. */
+};
+/* List element. */
+struct list_elem {
+	struct list_elem *prev;     /* Previous list element. */
+	struct list_elem *next;     /* Next list element. */
+};
+/* List. */
+struct list {
+	struct list_elem head;      /* List head. */
+	struct list_elem tail;      /* List tail. */
+};
+
+/* Initializes semaphore SEMA to VALUE.  A semaphore is a
+   nonnegative integer along with two atomic operators for
+   manipulating it:
+
+   - down or "P": wait for the value to become positive, then
+   decrement it.
+
+   - up or "V": increment the value (and wake up one waiting
+   thread, if any). */
+void
+sema_init (struct semaphore *sema, unsigned value) {
+	ASSERT (sema != NULL);
+
+	sema->value = value;
+	list_init (&sema->waiters);
+}
+
+/* Down or "P" operation on a semaphore.  Waits for SEMA's value
+   to become positive and then atomically decrements it.
+
+   This function may sleep, so it must not be called within an
+   interrupt handler.  This function may be called with
+   interrupts disabled, but if it sleeps then the next scheduled
+   thread will probably turn interrupts back on. This is
+   sema_down function. */
+void
+sema_down (struct semaphore *sema) {
+	enum intr_level old_level;
+
+	ASSERT (sema != NULL);
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+
+	/* waiters 리스트 삽입 시, 우선순위대로 삽입되도록 수정 */
+
+	while (sema->value == 0) {
+		list_push_back (&sema->waiters, &thread_current ()->elem);
+		thread_block ();
+	}
+	sema->value--;
+	intr_set_level (old_level);
+}
+
+/* Down or "P" operation on a semaphore, but only if the
+   semaphore is not already 0.  Returns true if the semaphore is
+   decremented, false otherwise.
+
+   This function may be called from an interrupt handler. */
+bool
+sema_try_down (struct semaphore *sema) {
+	enum intr_level old_level;
+	bool success;
+
+	ASSERT (sema != NULL);
+
+	old_level = intr_disable ();
+	if (sema->value > 0)
+	{
+		sema->value--;
+		success = true;
+	}
+	else
+		success = false;
+	intr_set_level (old_level);
+
+	return success;
+}
+
+/* Up or "V" operation on a semaphore.  Increments SEMA's value
+   and wakes up one thread of those waiting for SEMA, if any.
+
+   This function may be called from an interrupt handler. */
+void
+sema_up (struct semaphore *sema) {
+	enum intr_level old_level;
+
+	ASSERT (sema != NULL);
+
+	old_level = intr_disable ();
+	if (!list_empty (&sema->waiters))
+		/* 스레드가 waiters list에 있는 동안 우선순위가 변경 되었을
+			경우를 고려하여 waiters list를 우선순위로 정렬 한다. */
+		// list_sort();
+		thread_unblock (list_entry (list_pop_front (&sema->waiters),
+					struct thread, elem));
+	sema->value++;
+	/* priority preemption 코드 추가 */
+	test_max_priority();
+	intr_set_level (old_level);
+}
+
+static void sema_test_helper (void *sema_);
+
+/* Self-test for semaphores that makes control "ping-pong"
+   between a pair of threads.  Insert calls to printf() to see
+   what's going on. */
+void
+sema_self_test (void) {
+	struct semaphore sema[2];
+	int i;
+
+	printf ("Testing semaphores...");
+	sema_init (&sema[0], 0);
+	sema_init (&sema[1], 0);
+	thread_create ("sema-test", PRI_DEFAULT, sema_test_helper, &sema);
+	for (i = 0; i < 10; i++)
+	{
+		sema_up (&sema[0]);
+		sema_down (&sema[1]);
+	}
+	printf ("done.\n");
+}
+
+
+/* Thread function used by sema_self_test(). */
+static void
+sema_test_helper (void *sema_) {
+	struct semaphore *sema = sema_;
+	int i;
+
+	for (i = 0; i < 10; i++)
+	{
+		sema_down (&sema[0]);
+		sema_up (&sema[1]);
+	}
+}
+
+/* Initializes LOCK.  A lock can be held by at most a single
+   thread at any given time.  Our locks are not "recursive", that
+   is, it is an error for the thread currently holding a lock to
+   try to acquire that lock.
+
+   A lock is a specialization of a semaphore with an initial
+   value of 1.  The difference between a lock and such a
+   semaphore is twofold.  First, a semaphore can have a value
+   greater than 1, but a lock can only be owned by a single
+   thread at a time.  Second, a semaphore does not have an owner,
+   meaning that one thread can "down" the semaphore and then
+   another one "up" it, but with a lock the same thread must both
+   acquire and release it.  When these restrictions prove
+   onerous, it's a good sign that a semaphore should be used,
+   instead of a lock. */
+void
+lock_init (struct lock *lock) {
+	ASSERT (lock != NULL);
+
+	lock->holder = NULL;
+	sema_init (&lock->semaphore, 1);
+}
+
+/* Acquires LOCK, sleeping until it becomes available if
+   necessary.  The lock must not already be held by the current
+   thread.
+
+   This function may sleep, so it must not be called within an
+   interrupt handler.  This function may be called with
+   interrupts disabled, but interrupts will be turned back on if
+   we need to sleep. */
+void
+lock_acquire (struct lock *lock) {
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (!lock_held_by_current_thread (lock));
+
+	sema_down (&lock->semaphore);
+	lock->holder = thread_current ();
+}
+
+/* Tries to acquires LOCK and returns true if successful or false
+   on failure.  The lock must not already be held by the current
+   thread.
+
+   This function will not sleep, so it may be called within an
+   interrupt handler. */
+bool
+lock_try_acquire (struct lock *lock) {
+	bool success;
+
+	ASSERT (lock != NULL);
+	ASSERT (!lock_held_by_current_thread (lock));
+
+	success = sema_try_down (&lock->semaphore);
+	if (success)
+		lock->holder = thread_current ();
+	return success;
+}
+
+/* Releases LOCK, which must be owned by the current thread.
+   This is lock_release function.
+
+   An interrupt handler cannot acquire a lock, so it does not
+   make sense to try to release a lock within an interrupt
+   handler. */
+void
+lock_release (struct lock *lock) {
+	ASSERT (lock != NULL);
+	ASSERT (lock_held_by_current_thread (lock));
+
+	lock->holder = NULL;
+	sema_up (&lock->semaphore);
+}
+
+/* Returns true if the current thread holds LOCK, false
+   otherwise.  (Note that testing whether some other thread holds
+   a lock would be racy.) */
+bool
+lock_held_by_current_thread (const struct lock *lock) {
+	ASSERT (lock != NULL);
+
+	return lock->holder == thread_current ();
+}
+
+
+struct semaphore {
+	unsigned value;             /* Current value. */
+	struct list waiters;        /* List of waiting threads. */
+};
+
+/* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+
+struct condition {
+	struct list waiters;        /* List of waiting threads. */
+};
+
+struct list_elem {
+	struct list_elem *prev;     /* Previous list element. */
+	struct list_elem *next;     /* Next list element. */
+};
+
+struct thread {
+	/* Owned by thread.c. */
+	/* 구현: 깨어나야할 tick을 저장할 변수 추가 */
+	int64_t tick;
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
+	char name[16];                      /* Name (for debugging purposes). */
+	int priority;                       /* Priority. */
+
+	/* Shared between thread.c and synch.c. */
+	struct list_elem elem;      
+}
+/* Initializes condition variable COND.  A condition variable
+   allows one piece of code to signal a condition and cooperating
+   code to receive the signal and act upon it. */
+
+void
+cond_init (struct condition *cond) {
+	ASSERT (cond != NULL);
+
+	list_init (&cond->waiters);
+}
+
+/* Atomically releases LOCK and waits for COND to be signaled by
+   some other piece of code.  After COND is signaled, LOCK is
+   reacquired before returning.  LOCK must be held before calling
+   this function.
+
+   The monitor implemented by this function is "Mesa" style, not
+   "Hoare" style, that is, sending and receiving a signal are not
+   an atomic operation.  Thus, typically the caller must recheck
+   the condition after the wait completes and, if necessary, wait
+   again.
+
+   A given condition variable is associated with only a single
+   lock, but one lock may be associated with any number of
+   condition variables.  That is, there is a one-to-many mapping
+   from locks to condition variables.
+
+   This function may sleep, so it must not be called within an
+   interrupt handler.  This function may be called with
+   interrupts disabled, but interrupts will be turned back on if
+   we need to sleep. */
+void
+cond_wait (struct condition *cond, struct lock *lock) {
+	struct semaphore_elem waiter;
+
+	ASSERT (cond != NULL);
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (lock_held_by_current_thread (lock));
+
+	/* condition variable의 waiters list에 우선순위 순서로
+		삽입되도록 수정 */
+
+	sema_init (&waiter.semaphore, 0);
+	list_push_back (&cond->waiters, &waiter.elem);
+	lock_release (lock);
+	sema_down (&waiter.semaphore);
+	lock_acquire (lock);
+}
+
+/* If any threads are waiting on COND (protected by LOCK), then
+   this function signals one of them to wake up from its wait.
+   LOCK must be held before calling this function.
+
+   An interrupt handler cannot acquire a lock, so it does not
+   make sense to try to signal a condition variable within an
+   interrupt handler. */
+void
+cond_signal (struct condition *cond, struct lock *lock UNUSED) {
+	ASSERT (cond != NULL);
+	ASSERT (lock != NULL);
+	ASSERT (!intr_context ());
+	ASSERT (lock_held_by_current_thread (lock));
+
+	if (!list_empty (&cond->waiters))
+		/* condition variable의 waiters list를 우선순위로 재정렬 */
+		sema_up (&list_entry (list_pop_front (&cond->waiters),
+					struct semaphore_elem, elem)->semaphore);
+}
+
+/* Wakes up all threads, if any, waiting on COND (protected by
+   LOCK).  LOCK must be held before calling this function.
+
+   An interrupt handler cannot acquire a lock, so it does not
+   make sense to try to signal a condition variable within an
+   interrupt handler. */
+void
+cond_broadcast (struct condition *cond, struct lock *lock) {
+	ASSERT (cond != NULL);
+	ASSERT (lock != NULL);
+
+	while (!list_empty (&cond->waiters))
+		cond_signal (cond, lock);
+}
+
+void
+list_insert_ordered (struct list *list, struct list_elem *elem,
+		list_less_func *less, void *aux) {
+	struct list_elem *e;
+
+	ASSERT (list != NULL);
+	ASSERT (elem != NULL);
+	ASSERT (less != NULL);
+
+	for (e = list_begin (list); e != list_end (list); e = list_next (e))
+		if (less (elem, e, aux))
+			break;
+	return list_insert (e, elem);
+}
+
+bool cmp_sem_priority(const struct list_elem* a,
+						const struct list_elem* b,
+						void *aux UNUSED)
+{
+	struct semaphore_elem* sa = list_entry(a,
+										struct semaphore_elem, elem);
+	struct semaphore_elem* sb = list_entry(b,
+										struct semaphore_elem, elem);
+
+	/* 해당 condition variable을 기다리는 세마포어 리스트를
+		가장 높은 우선순위를 가지는 스레드의 우선순위 순으로 정렬하도록 구현 */
+
+	struct list_elem* sa_le = list_begin(&sa->semaphore.waiters);
+	struct list_elem* sb_le = list_begin(&sb->semaphore.waiters);
+
+	struct thread* sa_thread = list_entry(sa_le, struct thread, elem);
+	struct thread* sb_thread = list_entry(sb_le, struct thread, elem);
+
+	if(sa_thread->priority > sb_thread->priority) 
+		return 1;
+	return 0;
+}
+
+#ifndef THREADS_SYNCH_H
+#define THREADS_SYNCH_H
+
+#include <debug.h>
+#include <stddef.h>
+#include <list.h>
+#include <stdbool.h>
+
+/* A counting semaphore. */
+struct semaphore {
+	unsigned value;             /* Current value. */
+	struct list waiters;        /* List of waiting threads. */
+};
+
+void sema_init (struct semaphore *, unsigned value);
+void sema_down (struct semaphore *);
+bool sema_try_down (struct semaphore *);
+void sema_up (struct semaphore *);
+void sema_self_test (void);
+bool cmp_sem_priority(const struct list_elem* a,
+						const struct list_elem* b,
+						void *aux UNUSED);
+
+/* Lock. */
+struct lock {
+	struct thread *holder;      /* Thread holding lock (for debugging). */
+	struct semaphore semaphore; /* Binary semaphore controlling access. */
+};
+
+void lock_init (struct lock *);
+void lock_acquire (struct lock *);
+bool lock_try_acquire (struct lock *);
+void lock_release (struct lock *);
+bool lock_held_by_current_thread (const struct lock *);
+
+/* Condition variable. */
+struct condition {
+	struct list waiters;        /* List of waiting threads. */
+};
+
+void cond_init (struct condition *);
+void cond_wait (struct condition *, struct lock *);
+void cond_signal (struct condition *, struct lock *);
+void cond_broadcast (struct condition *, struct lock *);
+
+/* Optimization barrier.
+ *
+ * The compiler will not reorder operations across an
+ * optimization barrier.  See "Optimization Barriers" in the
+ * reference guide for more information.*/
+#define barrier() asm volatile ("" : : : "memory")
+
+#endif /* threads/synch.h */
+
+
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -26,19 +514,26 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+static struct list ready_list; // 새로 생성된 쓰레드가 들어가는 곳
+
+/* 구현: Sleep list 자료구조 추가 */
+static struct list sleep_list;
 
 /* Idle thread. */
-static struct thread *idle_thread;
+static struct thread *idle_thread; // cpu를 갖고 있지만, 디스크 업무로 인해 아무 일도 안하는
+// running thread
 
 /* Initial thread, the thread running init.c:main(). */
-static struct thread *initial_thread;
+static struct thread *initial_thread; // 그냥 빈 thread 초기에 할당 해주는 놈이야
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
 /* Thread destruction requests */
 static struct list destruction_req;
+
+/* 구현: sleep_list에서 대기중인 쓰레드들의 wakeup_tick 값 중 최소값을 저장 */
+int next_tick_to_awake = INT64_MAX;
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -63,11 +558,11 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-/* Thread sleep과 awake 구현 */
-void thread_sleep(int64_t ticks);
-void thread_awake(int64_t ticks);
-void update_next_tick_to_awake(int64_t ticks);
-int64_t get_next_tick_to_awake(void);
+// /* Thread sleep과 awake 구현 */
+// void thread_sleep(int64_t ticks);
+// void thread_awake(int64_t ticks);
+// void update_next_tick_to_awake(int64_t ticks);
+// int64_t get_next_tick_to_awake(void);
 
 
 
@@ -100,9 +595,10 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
-/* Sleep_list를 초기화!!! */
+
 void
 thread_init (void) {
+	
 	ASSERT (intr_get_level () == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel
@@ -118,6 +614,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+
+	/* Sleep queue 자료구조 초기화 코드 추가 */
+	list_init(&sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -216,6 +715,16 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
+		우선순위 보다 높다면 CPU를 양보한다. */
+	/* 갈까? */
+	test_max_priority();
+
+	/* 성심당 가자 */
+	// struct thread* curr = thread_current();
+	// if (cmp_priority(&t->elem, &curr->elem, NULL))
+	// 	thread_yield();
+
 	return tid;
 }
 
@@ -249,36 +758,141 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+
+	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
+	/* 갈까? */
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
+
+	struct list_elem* new_ele = &(t->elem);
+
+	while (cmp_priority(new_ele, new_ele->prev,0)){
+		if (new_ele->prev->prev == NULL)
+			break;
+		swap_priority(new_ele,new_ele->prev);
+	}
+	// 유성 순대군 가자
+	// list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	// t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
 
+void swap_priority(struct list_elem* new_ele, struct list_elem* new_ele_prev){
+	ASSERT (new_ele);
+	ASSERT (new_ele_prev);
+
+	struct list_elem* right = new_ele->next;
+	struct list_elem* left = new_ele_prev->prev;
+
+	new_ele->prev = left;
+	new_ele->next = new_ele_prev;
+
+	new_ele_prev->next = right;
+	new_ele_prev->prev = new_ele;
+
+	right->prev = new_ele_prev;
+	left->next = new_ele;
+}
+
+
+// idle일때는 다른 곳에서 체크하는 걸로 결론
 void
-thread_sleep(int64_t ticks){
-	/* 현재 스레드가 idle 스레드가 아닐경우
-		thread의 상태를 blocked로 바꾸고 깨어나야 할 ticks을 저장,
-		sleep queue에 삽입하고, awake 함수가 실행되어야 할 tick값을 update	
-	 */
-	 /* 현재 스레드를 슬립 큐에 삽입한 후에 스케줄한다 */
-	 /* 해당 과정중에는 인터럽트를 받아들이지 않는다 */
+thread_sleep(int64_t ticks){ // 깨울 시간
+	struct thread* curr = thread_current();
+	ASSERT(!intr_context());
+	enum intr_level old_level = intr_disable(); // 동기화를 위해 cpu가 interrupt를 듣지 못하게 한다
+
+	curr->tick = ticks; //  tick 후 깨어남
+
+	int64_t start = timer_ticks(); // 현재 시간
+	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
+		list_push_back(&sleep_list, &(curr->elem));
+	}
+	update_next_tick_to_awake(ticks);
+	do_schedule(THREAD_BLOCKED);
+
+	intr_set_level (old_level);
+	return;
 }
 
 void
-thread_awake(int64_t ticks){
-	/* sleep list의 모든 entry를 순회하며 다음과 같은 작업을 수행한다 */
-	/* 현재 tick이 깨워야 할 tick 보다 크거나 같다면 슬립 큐에서 제거하고 unblock 한다 */
-	/* 작다면 update_next_tick_to_awake()를 호출한다 */
+thread_awake(int64_t ticks){ // 현재시간
+
+	next_tick_to_awake = INT64_MAX; // 깨우면서 최대값 설정
+	struct list_elem* e;
+
+	for (e= list_begin(&sleep_list); e != list_end(&sleep_list);){
+		struct thread* wakeThread = list_entry(e, struct thread, elem);
+		if (wakeThread->tick <= ticks) // 현재 시간이 thread의 tick보다 크거나 같다면
+		{
+			e = list_remove(e); // 슬립 큐에서 제거하고 next를 위해 변수 저장
+			thread_unblock(wakeThread); // unblock
+
+		}
+		else { // 현재 시간이 thread의 tick보다 작으면
+			update_next_tick_to_awake(ticks); // 현재 시간
+			e = list_next(e);
+		}
+	}
 }
 
-void update_next_tick_to_awake(int64_t ticks){
+void update_next_tick_to_awake(int64_t ticks){ // 현재 시간
 	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
+	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;
 }
 
 int64_t get_next_tick_to_awake(void){
 	/* next_tick_to_awake을 반환한다 */
+	return next_tick_to_awake;
 }
 
+void test_max_priority(void)
+{
+	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
+		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
+	/* 갈까? */
+	// ASSERT (thread_current());
+
+	// enum intr_level old_level = intr_disable(); // interrupt disable
+	// struct thread* curr = thread_current(); // 현재 쓰레드 반환
+	// struct list_elem* max_ele = list_begin(&ready_list);
+	// struct thread* max_thread = list_entry(max_ele, struct thread, elem);
+
+	// if (!list_empty(&ready_list)){
+	// 	if (curr->priority < max_thread->priority){
+	// 		list_push_back(&sleep_list, &(curr->elem));
+	// 		do_schedule(THREAD_BLOCKED);
+			
+	// }}
+	// intr_set_level (old_level); // interrupt enable
+
+	/* 어니언 키친 가자 */
+	if (list_empty(&ready_list)) {
+		return;
+	}
+
+	int run_priority = thread_current()->priority;
+	struct list_elem *e = list_begin(&ready_list);
+	struct thread *t = list_entry(e, struct thread, elem);
+
+	if (t->priority > run_priority) {
+		thread_yield();
+	}
+	return;
+}
+
+bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
+{
+	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+	ASSERT (a_ != NULL);
+	ASSERT (b_ != NULL);
+
+	struct thread* a_thread = list_entry(a_, struct thread, elem);
+	struct thread* b_thread = list_entry(b_, struct thread, elem);
+	if (a_thread->priority > b_thread->priority)
+		return 1;
+	return 0;
+}
 
 /* Returns the name of the running thread. */
 const char *
@@ -323,7 +937,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
-	do_schedule (THREAD_DYING);
+	do_schedule (THREAD_DYING); 
 	NOT_REACHED ();
 }
 
@@ -337,8 +951,24 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+
+	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때
+		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+	/* 갈까? */
+	if (curr != idle_thread){
+	// 	list_push_back (&ready_list, &curr->elem);
+
+	// struct list_elem* new_ele = &(curr->elem);
+
+	// while (cmp_priority(new_ele, new_ele->prev,0)){
+	// 	if (new_ele->prev->prev == NULL)
+	// 		break;
+
+	// 	swap_priority(new_ele,new_ele->prev);
+		/* 학식 가즈아 */
+		list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
+	}
+
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -347,6 +977,10 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+
+	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
+	test_max_priority();
+
 }
 
 /* Returns the current thread's priority. */
@@ -563,7 +1197,7 @@ thread_launch (struct thread *th) {
 static void
 do_schedule(int status) {
 	ASSERT (intr_get_level () == INTR_OFF);
-	ASSERT (thread_current()->status == THREAD_RUNNING);
+	ASSERT (thread_current()->status == THREAD_RUNNING); 
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
@@ -575,20 +1209,21 @@ do_schedule(int status) {
 
 /* 
 	현재 실행 중인 쓰레드와 다음 쓰레드의 교환
+
 */
 static void
 schedule (void) {
-	struct thread *curr = running_thread ();
-	struct thread *next = next_thread_to_run ();
+	struct thread *curr = running_thread (); 
+	struct thread *next = next_thread_to_run (); // run queue에서 가져오는데, 없으면 idle queue에서 가져온다
 
 	ASSERT (intr_get_level () == INTR_OFF);
 	ASSERT (curr->status != THREAD_RUNNING);
 	ASSERT (is_thread (next));
 	/* Mark us as running. */
-	next->status = THREAD_RUNNING;
+	next->status = THREAD_RUNNING; // running status로 수정
 
 	/* Start new time slice. */
-	thread_ticks = 0;
+	thread_ticks = 0; // 새로운 tick을 설정한다
 
 #ifdef USERPROG
 	/* Activate the new address space. */
@@ -596,7 +1231,6 @@ schedule (void) {
 #endif
 
 	if (curr != next) {
-		struct thread* a = switch_threads(curr, next);
 		/* If the thread we switched from is dying, destroy its struct
 		   thread. This must happen late so that thread_exit() doesn't
 		   pull out the rug under itself.
@@ -611,7 +1245,7 @@ schedule (void) {
 
 		/* Before switching the thread, we first save the information
 		 * of current running. */
-		thread_launch (next);
+		thread_launch (next); 
 	}
 }
 
@@ -627,9 +1261,6 @@ allocate_tid (void) {
 
 	return tid;
 }
-
-
-
 
 
 #include "list.h"
@@ -1120,199 +1751,4 @@ list_min (struct list *list, list_less_func *less, void *aux) {
 				min = e;
 	}
 	return min;
-}
-
-
-
-#include "devices/timer.h"
-#include <debug.h>
-#include <inttypes.h>
-#include <round.h>
-#include <stdio.h>
-#include "threads/interrupt.h"
-#include "threads/io.h"
-#include "threads/synch.h"
-#include "threads/thread.h"
-
-/* See [8254] for hardware details of the 8254 timer chip. */
-
-#if TIMER_FREQ < 19
-#error 8254 timer requires TIMER_FREQ >= 19
-#endif
-#if TIMER_FREQ > 1000
-#error TIMER_FREQ <= 1000 recommended
-#endif
-
-/* Number of timer ticks since OS booted. */
-static int64_t ticks;
-
-/* Number of loops per timer tick.
-   Initialized by timer_calibrate(). */
-static unsigned loops_per_tick;
-
-static intr_handler_func timer_interrupt;
-static bool too_many_loops (unsigned loops);
-static void busy_wait (int64_t loops);
-static void real_time_sleep (int64_t num, int32_t denom);
-
-/* Sets up the 8254 Programmable Interval Timer (PIT) to
-   interrupt PIT_FREQ times per second, and registers the
-   corresponding interrupt. */
-void
-timer_init (void) {
-	/* 8254 input frequency divided by TIMER_FREQ, rounded to
-	   nearest. */
-	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
-
-	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
-	outb (0x40, count & 0xff);
-	outb (0x40, count >> 8);
-
-	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-}
-
-/* Calibrates loops_per_tick, used to implement brief delays. */
-void
-timer_calibrate (void) {
-	unsigned high_bit, test_bit;
-
-	ASSERT (intr_get_level () == INTR_ON);
-	printf ("Calibrating timer...  ");
-
-	/* Approximate loops_per_tick as the largest power-of-two
-	   still less than one timer tick. */
-	loops_per_tick = 1u << 10;
-	while (!too_many_loops (loops_per_tick << 1)) {
-		loops_per_tick <<= 1;
-		ASSERT (loops_per_tick != 0);
-	}
-
-	/* Refine the next 8 bits of loops_per_tick. */
-	high_bit = loops_per_tick;
-	for (test_bit = high_bit >> 1; test_bit != high_bit >> 10; test_bit >>= 1)
-		if (!too_many_loops (high_bit | test_bit))
-			loops_per_tick |= test_bit;
-
-	printf ("%'"PRIu64" loops/s.\n", (uint64_t) loops_per_tick * TIMER_FREQ);
-}
-
-/* Returns the number of timer ticks since the OS booted. */
-int64_t
-timer_ticks (void) {
-	enum intr_level old_level = intr_disable ();
-	int64_t t = ticks;
-	intr_set_level (old_level);
-	barrier ();
-	return t;
-}
-
-/* Returns the number of timer ticks elapsed since THEN, which
-   should be a value once returned by timer_ticks(). */
-int64_t
-timer_elapsed (int64_t then) {
-	return timer_ticks () - then;
-}
-
-/* Suspends execution for approximately TICKS timer ticks. */
-/* Sleep queue를 이용하도록 함수 수정 */
-void
-timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
-	/* 기존의 busy waiting을 유발하는 코드를 삭제*/
-	/* 새로 구현한 thread를 sleep queue를 삽입하는 함수를 호출*/
-
-	ASSERT (intr_get_level () == INTR_ON);
-	// while (timer_elapsed (start) < ticks)
-	// 	thread_yield ();
-}
-
-/* Suspends execution for approximately MS milliseconds. */
-void
-timer_msleep (int64_t ms) {
-	real_time_sleep (ms, 1000);
-}
-
-/* Suspends execution for approximately US microseconds. */
-void
-timer_usleep (int64_t us) {
-	real_time_sleep (us, 1000 * 1000);
-}
-
-/* Suspends execution for approximately NS nanoseconds. */
-void
-timer_nsleep (int64_t ns) {
-	real_time_sleep (ns, 1000 * 1000 * 1000);
-}
-
-/* Prints timer statistics. */
-void
-timer_print_stats (void) {
-	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
-}
-
-/* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
-	thread_tick ();
-	/* 매 tick마다 sleep queue에서 깨어날 thread가 있는지 확인하여,
-		깨우는 함수를 호출하도록 한다.
-	*/
-}
-
-/* Returns true if LOOPS iterations waits for more than one timer
-   tick, otherwise false. */
-static bool
-too_many_loops (unsigned loops) {
-	/* Wait for a timer tick. */
-	int64_t start = ticks;
-	while (ticks == start)
-		barrier ();
-
-	/* Run LOOPS loops. */
-	start = ticks;
-	busy_wait (loops);
-
-	/* If the tick count changed, we iterated too long. */
-	barrier ();
-	return start != ticks;
-}
-
-/* Iterates through a simple loop LOOPS times, for implementing
-   brief delays.
-
-   Marked NO_INLINE because code alignment can significantly
-   affect timings, so that if this function was inlined
-   differently in different places the results would be difficult
-   to predict. */
-static void NO_INLINE
-busy_wait (int64_t loops) {
-	while (loops-- > 0)
-		barrier ();
-}
-
-/* Sleep for approximately NUM/DENOM seconds. */
-static void
-real_time_sleep (int64_t num, int32_t denom) {
-	/* Convert NUM/DENOM seconds into timer ticks, rounding down.
-
-	   (NUM / DENOM) s
-	   ---------------------- = NUM * TIMER_FREQ / DENOM ticks.
-	   1 s / TIMER_FREQ ticks
-	   */
-	int64_t ticks = num * TIMER_FREQ / denom;
-
-	ASSERT (intr_get_level () == INTR_ON);
-	if (ticks > 0) {
-		/* We're waiting for at least one full timer tick.  Use
-		   timer_sleep() because it will yield the CPU to other
-		   processes. */
-		timer_sleep (ticks);
-	} else {
-		/* Otherwise, use a busy-wait loop for more accurate
-		   sub-tick timing.  We scale the numerator and denominator
-		   down by 1000 to avoid the possibility of overflow. */
-		ASSERT (denom % 1000 == 0);
-		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
-	}
 }

@@ -69,9 +69,12 @@ sema_down (struct semaphore *sema) {
 	/* waiters 리스트 삽입 시, 우선순위대로 삽입되도록 수정 */
 
 	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+
+		list_insert_ordered(&sema->waiters, &thread_current ()->elem, &cmp_priority,NULL);
 		thread_block ();
+		// sema->value++; // 재확인
 	}
+	// schedule(); // 재확인
 	sema->value--;
 	intr_set_level (old_level);
 }
@@ -113,13 +116,21 @@ sema_up (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	if (!list_empty (&sema->waiters))
+
+	{
 		/* 스레드가 waiters list에 있는 동안 우선순위가 변경 되었을
-			경우를 고려하여 waiters list를 우선순위로 정렬 한다. */
+		경우를 고려하여 waiters list를 우선순위로 정렬 한다. */
+		list_sort(&sema->waiters,&cmp_priority,0);
 
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
+	}
 	sema->value++;
 	/* priority preemption 코드 추가 */
+
+	// thread_yield();
+	test_max_priority();
+
 	intr_set_level (old_level);
 }
 
@@ -145,19 +156,6 @@ sema_self_test (void) {
 	printf ("done.\n");
 }
 
-bool cmp_sem_priority(const struct list_elem* a,
-						const struct list_elem* b,
-						void* aux UNUSED)
-{
-	struct semaphore_elem* sa = list_entry(a,
-										struct semaphore_elem, elem);
-	struct semaphore_elem* sb = list_entry(b,
-										struct semaphore_elem, elem);
-
-	/* 해당 condition variable을 기다리는 세마포어 리스트를
-		가장 높은 우선순위를 가지는 스레드의 우선순위 순으로 정렬하도록 구현 */
-}
-
 
 /* Thread function used by sema_self_test(). */
 static void
@@ -171,7 +169,7 @@ sema_test_helper (void *sema_) {
 		sema_up (&sema[1]);
 	}
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -256,7 +254,7 @@ lock_held_by_current_thread (const struct lock *lock) {
 
 	return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem {
 	struct list_elem elem;              /* List element. */
@@ -305,11 +303,15 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	/* condition variable의 waiters list에 우선순위 순서로
 		삽입되도록 수정 */
 
-	sema_init (&waiter.semaphore, 0);
-	list_push_back (&cond->waiters, &waiter.elem);
-	lock_release (lock);
-	sema_down (&waiter.semaphore);
-	lock_acquire (lock);
+	sema_init (&waiter.semaphore, 0); // semaphore_elem안에 있는 semaphore의 list생성
+	/* 갈까? */
+	list_push_back (&cond->waiters, &waiter.elem); // cond안의 waiter list에 waiter의 ele를 둔다
+	list_sort(&cond->waiters, &cmp_sem_priority,0);
+	// list_insert_ordered(&cond->waiters, &waiter.elem, &cmp_sem_priority,NULL)// 노래방 가자 - "형"
+	lock_release (lock); // if not empty => unblock & test_max_priority(thread_yield)
+	sema_down (&waiter.semaphore); // semaphore value를 감소 시키거나, 0이면 대기한다
+	lock_acquire (lock); // sema_down(), lock_holder 할당
+
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -327,9 +329,14 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters))
+
+	{
 		/* condition variable의 waiters list를 우선순위로 재정렬 */
+		list_sort(&cond->waiters,&cmp_sem_priority,0);
+
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
+	}
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -345,4 +352,23 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 
 	while (!list_empty (&cond->waiters))
 		cond_signal (cond, lock);
+}
+
+bool cmp_sem_priority(const struct list_elem* a,
+						const struct list_elem* b,
+						void *aux UNUSED)
+{
+	struct semaphore_elem* sa = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem* sb = list_entry(b, struct semaphore_elem, elem);
+
+	/* 해당 condition variable을 기다리는 세마포어 리스트를
+		가장 높은 우선순위를 가지는 스레드의 우선순위 순으로 정렬하도록 구현 */
+
+	struct list_elem* sa_le = list_begin(&sa->semaphore.waiters);
+	struct list_elem* sb_le = list_begin(&sb->semaphore.waiters);
+
+	struct thread* sa_thread = list_entry(sa_le, struct thread, elem);
+	struct thread* sb_thread = list_entry(sb_le, struct thread, elem);
+
+	return (sa_thread->priority > sb_thread->priority) ? 1 : 0;
 }
