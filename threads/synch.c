@@ -69,7 +69,7 @@ sema_down (struct semaphore *sema) {
 	/* waiters 리스트 삽입 시, 우선순위대로 삽입되도록 수정 */
 	while (sema->value == 0) {
 
-		list_insert_ordered(&sema->waiters, &thread_current ()->elem, cmp_sem_priority,NULL);
+		list_insert_ordered(&sema->waiters, &thread_current ()->elem, &cmp_priority,NULL);
 		thread_block ();
 		// sema->value++; // 재확인
 	}
@@ -118,7 +118,7 @@ sema_up (struct semaphore *sema) {
 	{
 		/* 스레드가 waiters list에 있는 동안 우선순위가 변경 되었을
 		경우를 고려하여 waiters list를 우선순위로 정렬 한다. */
-		list_sort(&sema->waiters,&cmp_sem_priority,0);
+		list_sort(&sema->waiters,&cmp_priority,0);
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
 	}
@@ -300,8 +300,10 @@ cond_wait (struct condition *cond, struct lock *lock) {
 		삽입되도록 수정 */
 
 	sema_init (&waiter.semaphore, 0); // semaphore_elem안에 있는 semaphore의 list생성
+	/* 갈까? */
 	list_push_back (&cond->waiters, &waiter.elem); // cond안의 waiter list에 waiter의 ele를 둔다
 	list_sort(&cond->waiters, &cmp_sem_priority,0);
+	// list_insert_ordered(&cond->waiters, &waiter.elem, &cmp_sem_priority,NULL)// 노래방 가자 - "형"
 	lock_release (lock); // if not empty => unblock & test_max_priority(thread_yield)
 	sema_down (&waiter.semaphore); // semaphore value를 감소 시키거나, 0이면 대기한다
 	lock_acquire (lock); // sema_down(), lock_holder 할당
