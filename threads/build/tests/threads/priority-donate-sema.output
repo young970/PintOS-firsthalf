@@ -1,0 +1,27 @@
+Kernel command line: -q run priority-donate-sema
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  157,081,600 loops/s.
+Boot complete.
+Executing 'priority-donate-sema':
+(priority-donate-sema) begin
+(priority-donate-sema) Thread L acquired lock.
+Interrupt 0x0e (#PF Page-Fault Exception) at rip=800420a8e7
+ cr2=fffffffffffffff8 error=               0
+rax ffffffffffffffd8 rbx 0000000000204400 rcx 0000008004234028 rdx 0000000000000000
+rsp 0000008004000dc0 rbp 0000008004000e10 rsi 0000008004235028 rdi 0000008004235040
+rip 000000800420a8e7 r8 0000008004000e5c  r9 0000008004216b9e r10 0000000000000000
+r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00200087
+es: 0010 ds: 0010 cs: 0008 ss: 0010
+Kernel PANIC at ../../threads/interrupt.c:361 in intr_handler(): Unexpected interrupt
+Call stack: 0x80042138ac 0x8004208ce4 0x8004209096 0x8004214632 0x80042149cd 0x8004209e37 0x8004218baa 0x8004216cf2 0x8004206636 0x8004206783 0x8004206120.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 25 ticks
+Thread: 0 idle ticks, 25 kernel ticks, 0 user ticks
+Console: 1

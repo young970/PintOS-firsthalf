@@ -355,34 +355,36 @@ void test_max_priority(void)
 	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
 		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
 	/* 갈까? */
-	ASSERT (thread_current());
+	// ASSERT (thread_current());
 
-	enum intr_level old_level = intr_disable(); // interrupt disable
-	struct thread* curr = thread_current(); // 현재 쓰레드 반환
-	struct list_elem* max_ele = list_begin(&ready_list);
-	struct thread* max_thread = list_entry(max_ele, struct thread, elem);
+	// enum intr_level old_level = intr_disable(); // interrupt disable
+	// struct thread* curr = thread_current(); // 현재 쓰레드 반환
+	// struct list_elem* max_ele = list_begin(&ready_list);
+	// struct thread* max_thread = list_entry(max_ele, struct thread, elem);
 
-	if (!list_empty(&ready_list)){
-		if (curr->priority < max_thread->priority){
+	// if (!list_empty(&ready_list)){
+	// 	if (curr->priority < max_thread->priority){
+	// 		list_push_back(&sleep_list, &(curr->elem));
+	// 		// jjh 여기도 우선순위 순으로 넣어야 하지 않는가
+	// 		// 가결. 어차피 우선순위로 빼준다
 
-			list_push_back(&sleep_list, &(curr->elem));
-			do_schedule(THREAD_BLOCKED);
+	// 		do_schedule(THREAD_BLOCKED);
 			
-	}}
-	intr_set_level (old_level); // interrupt enable
+	// }}
+	// intr_set_level (old_level); // interrupt enable
 
 	/* 어니언 키친 가자 */
-	// if (list_empty(&ready_list)) {
-	// 	return;
-	// }
+	if (list_empty(&ready_list)) {
+		return;
+	}
 
-	// int run_priority = thread_current()->priority;
-	// struct list_elem *e = list_begin(&ready_list);
-	// struct thread *t = list_entry(e, struct thread, elem);
+	int run_priority = thread_current()->priority;
+	struct list_elem *e = list_begin(&ready_list);
+	struct thread *t = list_entry(e, struct thread, elem);
 
-	// if (t->priority > run_priority) {
-	// 	thread_yield();
-	// }
+	if (t->priority > run_priority) {
+		thread_yield();
+	}
 	return;
 }
 
@@ -469,12 +471,11 @@ thread_yield (void) {
 	while (cmp_priority(new_ele, new_ele->prev,0)){
 		if (new_ele->prev->prev == NULL)
 			break;
-		// list_sort(&ready_list, &swap_priority,0);
-		// list_insert_ordered(&ready_list, new_ele, &swap_priority, 0);
+		
 
 		swap_priority(new_ele,new_ele->prev);
 		/* 학식 가즈아 */
-		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);s
+		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
 	}
 
 	do_schedule (THREAD_READY);

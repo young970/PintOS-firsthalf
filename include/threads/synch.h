@@ -2,6 +2,7 @@
 #define THREADS_SYNCH_H
 
 #include <debug.h>
+#include <stddef.h>
 #include <list.h>
 #include <stdbool.h>
 
@@ -27,16 +28,16 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 };
 
-void lock_init (struct lock *); // lock 자료구조를 초기화
-void lock_acquire (struct lock *); // lock을 요청청
-bool lock_try_acquire (struct lock *);
-void lock_release (struct lock *); // lock을 반환
-bool lock_held_by_current_thread (const struct lock *);
 
 /* Condition variable. */
 struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
+
+bool lock_try_acquire (struct lock *);
+void lock_release (struct lock *); // lock을 반환
+bool lock_held_by_current_thread (const struct lock *);
+
 
 void cond_init (struct condition *); // condition variable 자료구조를 초기화
 void cond_wait (struct condition *, struct lock *); // condition variable을 통해 signal이 오는지 기다림
