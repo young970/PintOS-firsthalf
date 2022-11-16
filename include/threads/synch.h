@@ -22,6 +22,11 @@ bool cmp_sem_priority(const struct list_elem* a,
 						void *aux UNUSED);
 
 
+void donate_priority(void);
+// void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+bool cmp_donation_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED);
+
 
 /* Lock. */
 struct lock {

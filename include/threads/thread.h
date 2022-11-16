@@ -98,7 +98,10 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct thread {
 	/* Owned by thread.c. */
-	/* 구현: 깨어나야할 tick을 저장할 변수 추가 */
+	int init_priority; // donation 이후 우선순위를 초기화하기 위해 초기값 저장
+	struct lock* wait_on_lock; // 해당 스레드가 대기 하고 있는 lock자료구조의 주소를 저장
+	struct list donations; // mulitple donation을 고려하기 위해 사용
+	struct list_elem donation_elem; // multiple donation을 고려하기 위해 사용
 	int64_t tick;
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
@@ -153,6 +156,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+void remove_with_lock(struct lock *lock);
 
 void do_iret (struct intr_frame *tf);
 
