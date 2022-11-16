@@ -157,6 +157,11 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+bool cmp_donation_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED);
+
 void do_iret (struct intr_frame *tf);
 
 #endif /* threads/thread.h */
