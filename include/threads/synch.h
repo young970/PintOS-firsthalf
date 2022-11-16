@@ -13,8 +13,14 @@ struct semaphore {
 	struct list waiters;        /* List of waiting threads. */
 };
 
-void sema_init (struct semaphore *, unsigned value); // semaphore를 주어진 value로 초기화
-void sema_down (struct semaphore *); // semaphore를 요청하고 획득했을 때 value를 1 낮춤
+/* One semaphore in a list. */
+struct semaphore_elem {
+	struct list_elem elem;              /* List element. */
+	struct semaphore semaphore;         /* This semaphore. */
+};
+
+void sema_init (struct semaphore *, unsigned value);
+void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *); // semaphore를 반환하고 value를 1 높임
 void sema_self_test (void);
