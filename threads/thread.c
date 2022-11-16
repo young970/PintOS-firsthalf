@@ -404,9 +404,7 @@ bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* 
 
 	struct thread* a_thread = list_entry(a_, struct thread, elem);
 	struct thread* b_thread = list_entry(b_, struct thread, elem);
-	if (a_thread->priority > b_thread->priority)
-		return 1;
-	return 0;
+	return (a_thread->priority > b_thread->priority) ? 1 : 0;
 }
 
 /* Returns the name of the running thread. */
@@ -598,6 +596,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 
 	/* Priority donation관련 자료구조 초기화 */
 	t->init_priority = priority;
+	list_init(&t->donations);
+	t->wait_on_lock = NULL;
 
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
