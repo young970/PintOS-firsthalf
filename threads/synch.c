@@ -32,6 +32,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -207,8 +208,28 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	struct thread *curr= thread_current(); // YSM - 수정해줌
+	
+	/* 해당 lock의 holder가 존재 한다면 아래 작업을 수행한다 */
+	if(lock->holder)
+	{
+	/* 현재 스레드의 wait_on_lock 변수에 획득 하기를 기다리는 lock의 주소를 저장 */
+		// struct thread *curr= thread_current();
+		curr->wait_on_lock = &lock;
+	// multiple donation을 고려하기 위해 이전상태의 우선순위를 기억,
+		// curr->init_priority = curr->priority; // YSM - 필요없다
+	// donation을 받은 스레드의 thread 구조체를 list로 관리한다
+		// list_push_back(&lock->holder->donations, &lock->holder);
+		list_push_back(&lock->holder->donations, &curr->donation_elem);
+	/* priority donation 수행하기 위해 donation_priority() 함수 호출 */
+		donate_priority();
+	}
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+	// thread_currenht()->wait_on_lock = NULL;
+	curr->wait_on_lock = NULL;
+	/* lock을 획득 한 후 lock holder를 갱신하다 */
+	// lock->holder = thread_current();
+	lock->holder = curr;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -242,9 +263,14 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
+
+	/* remove_with_lock() 함수추가 */
+	 remove_with_lock(lock);
+	/* refresh_priority() 함수추가 */
+	refresh_priority();
+
 	sema_up (&lock->semaphore);
 }
-
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
@@ -371,4 +397,79 @@ bool cmp_sem_priority(const struct list_elem* a,
 	struct thread* sb_thread = list_entry(sb_le, struct thread, elem);
 
 	return (sa_thread->priority > sb_thread->priority) ? 1 : 0;
+}
+
+
+void donate_priority(void)
+{
+	struct thread *curr = thread_current();
+	//현재 스레드가 기다리고 있는 lock
+	struct lock *waiting_lock = curr->wait_on_lock;
+	// lock과 연결된 모든 스레드들을 순회하며
+	// struct list_elem* cur_ele = list_begin(&waiting_lock->holder->donations); // waiters list -> donation list로 바꿔야 함
+	int depth = 0;
+
+	/* priority donation을 수행하는 함수를 구현한다.
+		현재 스레드가 기다리고 있는 lock과 연결된 모든 스레드들을 순회하며
+		현재 스레드의 우선순위를 lock을 보유하고 있는 스레드에게 기부 한다.
+		(Nested donation 그림 참고, nested depth는 8로 제한한다.) */
+	while(waiting_lock)
+	{
+		if(depth > 8) break; // 뎁스가 8 초과되면 나간다
+		if (curr->priority > waiting_lock->holder->priority){
+			waiting_lock->holder->priority = curr->priority;
+		}
+		depth++;
+		curr = waiting_lock->holder;
+		waiting_lock = curr->wait_on_lock;
+	}
+}
+
+// void remove_with_lock(struct lock *lock)
+// {
+// 	struct thread *curr = thread_current();
+// 	struct list_elem* cur_ele = list_begin(&curr->donations); // 3팀 whithout KYW
+// 	/* lock을 해지 했을 때 donations 리스트에서 해당 엔트리를
+// 		삭제하기 위한 함수를 구현한다. */
+// 	// if (!lock->holder)
+// 	// {
+// 	// 	list_remove(list_end(&lock->holder->donations)->prev);
+// 	// }
+	
+// 	/* 현재 스레드의 donations 리스트를 확인하여 해지 할 lock을
+// 		보유하고 있는 엔트리를 삭제 한다. */
+// 	for (cur_ele; cur_ele != list_end(&curr->donations); )
+// 	{
+// 		if (list_entry(cur_ele, struct thread, donation_elem)->wait_on_lock == lock) // lock을 비교해야 함
+// 		{
+// 			cur_ele = list_remove(cur_ele);
+// 			// break;
+// 		}
+// 		else {
+// 			cur_ele = list_next(cur_ele);
+// 		}
+// 	}
+	
+// }
+
+/* 스레드의 우선순위가 변경 되었을 때
+donation을 고려하여 우선 순위를 다시 결정하는 함수를 작성한다. */
+void refresh_priority(void)
+{
+
+	struct thread *curr = thread_current();
+	struct lock *curr_lock = curr->wait_on_lock;
+	struct thread *holder_priority = list_entry(list_begin(&curr->donations),struct thread, donation_elem);
+
+	/* 현재 스레드의 우선순위를 기부받기 전의 우선순위로 변경 */
+	curr->priority = curr->init_priority;
+	/* 가장 우선순위가 높은 donations 리스트의 스레드와
+		현재 스레드의 우선순위를 비교하여 높은 값을 현재 스레드의
+		우선순위로 설정한다. */
+	list_sort(&curr->donations, &cmp_donation_priority, NULL);
+	if(!list_empty(&curr->donations)) {
+		curr->priority = (curr->priority > holder_priority->priority) 
+						? curr->priority : holder_priority->priority; // 체크할 것
+	}
+	
 }

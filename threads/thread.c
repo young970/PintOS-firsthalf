@@ -494,7 +494,15 @@ void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
 
-	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
+	/* donation을 고려하여 thread_set_priority() 함수를 수정한다 */
+	
+
+	// refresh_priority()함수를 사용하여 우선순위를 변경으로 인한 donation 관련 정보를 갱신한다.
+	refresh_priority();
+	/* donation_priority(), test_mex_priority()함수를 적절히
+	사용하여 priority donation을 수행하고 스케줄링 한다.
+	*/
+	donate_priority();
 	test_max_priority();
 
 }
@@ -587,6 +595,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (t != NULL);
 	ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
 	ASSERT (name != NULL);
+
+	/* Priority donation관련 자료구조 초기화 */
+	t->init_priority = priority;
+	list_init(&t->donations);
+	t->wait_on_lock = NULL;
 
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
@@ -776,4 +789,42 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+bool cmp_donation_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
+{
+	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+	ASSERT (a_ != NULL);
+	ASSERT (b_ != NULL);
+
+	struct thread* a_thread = list_entry(a_, struct thread, donation_elem);
+	struct thread* b_thread = list_entry(b_, struct thread, donation_elem);
+	return (a_thread->priority > b_thread->priority) ? 1 : 0;
+}
+
+void remove_with_lock(struct lock *lock)
+{
+	struct thread *curr = thread_current();
+	struct list_elem* cur_ele = list_begin(&curr->donations); // 3팀 whithout KYW
+	/* lock을 해지 했을 때 donations 리스트에서 해당 엔트리를
+		삭제하기 위한 함수를 구현한다. */
+	// if (!lock->holder)
+	// {
+	// 	list_remove(list_end(&lock->holder->donations)->prev);
+	// }
+	
+	/* 현재 스레드의 donations 리스트를 확인하여 해지 할 lock을
+		보유하고 있는 엔트리를 삭제 한다. */
+	for (cur_ele; cur_ele != list_end(&curr->donations); )
+	{
+		if (list_entry(cur_ele, struct thread, donation_elem)->wait_on_lock == lock) // lock을 비교해야 함
+		{
+			cur_ele = list_remove(cur_ele);
+			// break;
+		}
+		else {
+			cur_ele = list_next(cur_ele);
+		}
+	}
+	
 }
