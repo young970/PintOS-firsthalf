@@ -70,7 +70,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-
+// 7조 화이팅
 
 
 /* Returns true if T appears to point to a valid thread. */
