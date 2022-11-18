@@ -32,6 +32,25 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+struct thread {
+	/* Owned by thread.c. */
+	int init_priority; // donation 이후 우선순위를 초기화하기 위해 초기값 저장
+	struct lock* wait_on_lock; // 해당 스레드가 대기 하고 있는 lock자료구조의 주소를 저장
+	struct list donations; // mulitple donation을 고려하기 위해 사용
+	struct list_elem donation_elem; // multiple donation을 고려하기 위해 사용
+	int64_t tick;
+	tid_t tid;                          /* Thread identifier. */
+	enum thread_status status;          /* Thread state. */
+	char name[16];                      /* Name (for debugging purposes). */
+	int priority;                       /* Priority. */
+
+	/* Shared between thread.c and synch.c. */
+	struct list_elem elem;              /* List element. */
+	/* Owned by thread.c. */
+	struct intr_frame tf;               /* Information for switching */
+	unsigned magic;                     /* Detects stack overflow. */
+};
+
 /* Lock. */
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */
@@ -227,7 +246,23 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	
+	/* 해당 lock의 holder가 존재 한다면 아래 작업을 수행한다 */
+	if(lock->holder)
+	{
+	/* 현재 스레드의 wait_on_lock 변수에 획득 하기를 기다리는 lock의 주소를 저장 */
+		struct thread *curr= thread_current();
+		curr->wait_on_lock = lock;
+	// multiple donation을 고려하기 위해 이전상태의 우선순위를 기억,
+		curr->init_priority = curr->priority;
+	// donation을 받은 스레드의 thread 구조체를 list로 관리한다
+		list_push_back(&lock->semaphore.waiters, &curr);
+	/* priority donation 수행하기 위해 donation_priority() 함수 호출 */
+		donate_priority();
+	}
 	sema_down (&lock->semaphore);
+	thread_current()->wait_on_lock = NULL;
+	/* lock을 획득 한 후 lock holder를 갱신하다 */
 	lock->holder = thread_current ();
 }
 
@@ -1504,6 +1539,7 @@ struct list_elem *e = list_pop_front (&list);
 */
 struct list_elem *
 list_remove (struct list_elem *elem) {
+	
 	ASSERT (is_interior (elem));
 	elem->prev->next = elem->next;
 	elem->next->prev = elem->prev;

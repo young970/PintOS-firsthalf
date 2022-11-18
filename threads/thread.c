@@ -98,13 +98,10 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
    was careful to put the bottom of the stack at a page boundary.
-
    Also initializes the run queue and the tid lock.
-
    After calling this function, be sure to initialize the page
    allocator before trying to create any threads with
    thread_create().
-
    It is not safe to call thread_current() until this function
    finishes. */
 
@@ -185,14 +182,12 @@ thread_print_stats (void) {
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
    for the new thread, or TID_ERROR if creation fails.
-
    If thread_start() has been called, then the new thread may be
    scheduled before thread_create() returns.  It could even exit
    before thread_create() returns.  Contrariwise, the original
    thread may run for any amount of time before the new thread is
    scheduled.  Use a semaphore or some other form of
    synchronization if you need to ensure ordering.
-
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
@@ -200,6 +195,8 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
+	struct thread* curr = thread_current();
+
 	tid_t tid;
 
 	ASSERT (function != NULL);
@@ -230,19 +227,17 @@ thread_create (const char *name, int priority,
 	/* 생성된 스레드의 우선순위가 현재 실행중인 스레드의 
 		우선순위 보다 높다면 CPU를 양보한다. */
 	/* 갈까? */
-	test_max_priority();
+	// test_max_priority();
 
 	/* 성심당 가자 */
-	// struct thread* curr = thread_current();
-	// if (cmp_priority(&t->elem, &curr->elem, NULL))
-	// 	thread_yield();
+	if (cmp_priority(&t->elem, &curr->elem, NULL))
+		thread_yield();
 
 	return tid;
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
-
    This function must be called with interrupts turned off.  It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
@@ -257,7 +252,6 @@ thread_block (void) {
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
    make the running thread ready.)
-
    This function does not preempt the running thread.  This can
    be important: if the caller had disabled interrupts itself,
    it may expect that it can atomically unblock a thread and
@@ -273,19 +267,19 @@ thread_unblock (struct thread *t) {
 
 	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
 	/* 갈까? */
-	list_push_back (&ready_list, &t->elem);
-	t->status = THREAD_READY;
-
-	struct list_elem* new_ele = &(t->elem);
-
-	while (cmp_priority(new_ele, new_ele->prev,0)){
-		if (new_ele->prev->prev == NULL)
-			break;
-		swap_priority(new_ele,new_ele->prev);
-	}
-	// 유성 순대군 가자
-	// list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	// list_push_back (&ready_list, &t->elem);
 	// t->status = THREAD_READY;
+
+	// struct list_elem* new_ele = &(t->elem);
+
+	// while (cmp_priority(new_ele, new_ele->prev,0)){
+	// 	if (new_ele->prev->prev == NULL)
+	// 		break;
+	// 	swap_priority(new_ele,new_ele->prev);
+	// }
+	// 유성 순대군 가자
+	list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
 
@@ -470,33 +464,39 @@ thread_yield (void) {
 	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때
 		우선순위 순서로 정렬되어 삽입 되도록 수정 */
 	/* 갈까? */
-	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+	// if (curr != idle_thread)
+	// 	list_push_back (&ready_list, &curr->elem);
 
-	struct list_elem* new_ele = &(curr->elem);
+	// struct list_elem* new_ele = &(curr->elem);
 
-	while (cmp_priority(new_ele, new_ele->prev,0)){
-		if (new_ele->prev->prev == NULL)
-			break;
+	// while (cmp_priority(new_ele, new_ele->prev,0)){
+	// 	if (new_ele->prev->prev == NULL)
+	// 		break;
 		
 
-		swap_priority(new_ele,new_ele->prev);
-		/* 학식 가즈아 */
-		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
-	}
+	// 	swap_priority(new_ele,new_ele->prev);
+	// }
+	/* 학식 가즈아 */
+	list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
 
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void
-thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+void thread_set_priority(int new_priority)
+{
+	thread_current()->init_priority = new_priority;
+ 	/* donation을 고려하여 thread_set_priority() 함수를 수정한다 */
+	
 
-	/* 스레드의 우선순위가 변경 되었을 때 우선순위에 따라 선점이 발생하도록 한다. */
+	// refresh_priority()함수를 사용하여 우선순위를 변경으로 인한 donation 관련 정보를 갱신한다.
+	refresh_priority();
+	/* donation_priority(), test_mex_priority()함수를 적절히
+	사용하여 priority donation을 수행하고 스케줄링 한다.
+	*/
+	donate_priority();
 	test_max_priority();
-
 }
 
 /* Returns the current thread's priority. */
@@ -533,7 +533,6 @@ thread_get_recent_cpu (void) {
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
-
    The idle thread is initially put on the ready list by
    thread_start().  It will be scheduled once initially, at which
    point it initializes idle_thread, "up"s the semaphore passed
@@ -554,7 +553,6 @@ idle (void *idle_started_ UNUSED) {
 		thread_block ();
 
 		/* Re-enable interrupts and wait for the next one.
-
 		   The `sti' instruction disables interrupts until the
 		   completion of the next instruction, so these two
 		   instructions are executed atomically.  This atomicity is
@@ -562,7 +560,6 @@ idle (void *idle_started_ UNUSED) {
 		   between re-enabling interrupts and waiting for the next
 		   one to occur, wasting as much as one clock tick worth of
 		   time.
-
 		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
 		   7.11.1 "HLT Instruction". */
 		asm volatile ("sti; hlt" : : : "memory");
@@ -588,12 +585,18 @@ init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
 	ASSERT (name != NULL);
 
+	/* Priority donation관련 자료구조 초기화 */
+
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	t->init_priority = priority;
+	list_init(&t->donations);
+	t->wait_on_lock = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -639,11 +642,9 @@ do_iret (struct intr_frame *tf) {
 
 /* Switching the thread by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
-
    At this function's invocation, we just switched from thread
    PREV, the new thread is already running, and interrupts are
    still disabled.
-
    It's not safe to call printf() until the thread switch is
    complete.  In practice that means that printf()s should be
    added at the end of the function. */
@@ -725,7 +726,6 @@ do_schedule(int status) {
 
 /* 
 	현재 실행 중인 쓰레드와 다음 쓰레드의 교환
-
 */
 static void
 schedule (void) {
@@ -776,4 +776,84 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+bool cmp_donation_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
+{
+	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+	ASSERT (a_ != NULL);
+	ASSERT (b_ != NULL);
+
+	struct thread* a_thread = list_entry(a_, struct thread, donation_elem);
+	struct thread* b_thread = list_entry(b_, struct thread, donation_elem);
+	return a_thread->priority > b_thread->priority;
+}
+
+void donate_priority (void)
+{
+	struct thread *curr = thread_current();
+	//현재 스레드가 기다리고 있는 lock
+	struct lock *waiting_lock = curr->wait_on_lock;
+	// lock과 연결된 모든 스레드들을 순회하며
+	// struct list_elem* cur_ele = list_begin(&waiting_lock->holder->donations); // waiters list -> donation list로 바꿔야 함
+	int depth = 0;
+
+	/* priority donation을 수행하는 함수를 구현한다.
+		현재 스레드가 기다리고 있는 lock과 연결된 모든 스레드들을 순회하며
+		현재 스레드의 우선순위를 lock을 보유하고 있는 스레드에게 기부 한다.
+		(Nested donation 그림 참고, nested depth는 8로 제한한다.) */
+	while(waiting_lock)
+	{
+		if(depth > 8) break; // 뎁스가 8 초과되면 나간다
+		if (curr->priority > waiting_lock->holder->priority){
+			waiting_lock->holder->priority = curr->priority;
+		}
+		depth++;
+		curr = waiting_lock->holder;
+		waiting_lock = curr->wait_on_lock;
+	}
+}
+
+void remove_with_lock (struct lock *lock)
+{
+	struct thread *curr = thread_current();
+	struct list_elem* cur_ele = list_begin(&curr->donations); // 3팀 whithout KYW
+	/* lock을 해지 했을 때 donations 리스트에서 해당 엔트리를
+		삭제하기 위한 함수를 구현한다. */
+	// if (!lock->holder)
+	// {
+	// 	list_remove(list_end(&lock->holder->donations)->prev);
+	// }
+	
+	/* 현재 스레드의 donations 리스트를 확인하여 해지 할 lock을
+		보유하고 있는 엔트리를 삭제 한다. */
+	for (cur_ele; cur_ele != list_end(&curr->donations); )
+	{
+		if (list_entry(cur_ele, struct thread, donation_elem)->wait_on_lock == lock) // lock을 비교해야 함
+		{
+			cur_ele = list_remove(cur_ele);
+			// break;
+		}
+		else {
+			cur_ele = list_next(cur_ele);
+		}
+	}
+}
+
+void refresh_priority (void)
+{
+	struct thread *curr = thread_current();
+	struct lock *curr_lock = curr->wait_on_lock;
+	struct thread *grand_donator = list_entry(list_begin(&curr->donations),struct thread, donation_elem);
+
+	/* 현재 스레드의 우선순위를 기부받기 전의 우선순위로 변경 */
+	curr->priority = curr->init_priority;
+	/* 가장 우선순위가 높은 donations 리스트의 스레드와
+		현재 스레드의 우선순위를 비교하여 높은 값을 현재 스레드의
+		우선순위로 설정한다. */
+	list_sort(&curr->donations, &cmp_donation_priority, NULL);
+	if(!list_empty(&curr->donations)) {
+		curr->priority = (curr->priority > grand_donator->priority) 
+						? curr->priority : grand_donator->priority; // 체크할 것
+	}
 }
