@@ -1,5 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
+#define USERPROG
 
 #include <debug.h>
 #include <list.h>
@@ -15,11 +16,14 @@ void thread_awake(int64_t ticks);
 void update_next_tick_to_awake(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 
+
 /* Priority Scheduling 함수 선언 */
 void test_max_priority(void); // 현재 수행중인 스레드와 가장 높은 우선순위의 스레드의 우선순위를 비교하여 스케쥴링
 bool cmp_priority(const struct list_elem *a, // 인자로 주어진 스레드들의 우선순위를 비교
 					const struct list_elem *b,
 					void *aux UNUSED);
+void swap_priority(struct list_elem* new_ele, 
+					struct list_elem* new_ele_prev); // list_ele swap 함수
 
 /* States in a thread's life cycle. */
 enum thread_status {
@@ -98,6 +102,7 @@ typedef int tid_t;
  * blocked state is on a semaphore wait list. */
 struct thread {
 	/* Owned by thread.c. */
+
 	int init_priority; // donation 이후 우선순위를 초기화하기 위해 초기값 저장
 	struct lock* wait_on_lock; // 해당 스레드가 대기 하고 있는 lock자료구조의 주소를 저장
 	struct list donations; // mulitple donation을 고려하기 위해 사용

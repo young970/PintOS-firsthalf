@@ -2,12 +2,12 @@
     "files.associations": {
         "*.html": "html",
         "interrupt.h": "c",
-<<<<<<< HEAD
-        "list.h": "c"
-=======
+<<<<<<<<< Temporary merge branch 1
         "timer.h": "c",
         "debug.h": "c",
         "thread.h": "c"
->>>>>>> 7f5f447abc715b8c3a1f00facfe6f09508696049
+=========
+        "list.h": "c"
+>>>>>>>>> Temporary merge branch 2
     }
 }

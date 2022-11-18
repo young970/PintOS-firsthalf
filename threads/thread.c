@@ -70,12 +70,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-// /* Thread sleep과 awake 구현 */
-// void thread_sleep(int64_t ticks);
-// void thread_awake(int64_t ticks);
-// void update_next_tick_to_awake(int64_t ticks);
-// int64_t get_next_tick_to_awake(void);
-
+// 7조 화이팅
 
 
 /* Returns true if T appears to point to a valid thread. */
@@ -236,6 +231,7 @@ thread_create (const char *name, int priority,
 	return tid;
 }
 
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
    This function must be called with interrupts turned off.  It
@@ -314,7 +310,9 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
 		list_push_back(&sleep_list, &(curr->elem));
 	}
+
 	update_next_tick_to_awake(ticks);
+
 	do_schedule(THREAD_BLOCKED);
 
 	intr_set_level (old_level);
@@ -344,6 +342,7 @@ thread_awake(int64_t ticks){ // 현재시간
 
 void update_next_tick_to_awake(int64_t ticks){ // 현재 시간
 	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
+
 	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;
 }
 
@@ -489,7 +488,6 @@ void thread_set_priority(int new_priority)
 	thread_current()->init_priority = new_priority;
  	/* donation을 고려하여 thread_set_priority() 함수를 수정한다 */
 	
-
 	// refresh_priority()함수를 사용하여 우선순위를 변경으로 인한 donation 관련 정보를 갱신한다.
 	refresh_priority();
 	/* donation_priority(), test_mex_priority()함수를 적절히
@@ -499,7 +497,7 @@ void thread_set_priority(int new_priority)
 	test_max_priority();
 }
 
-/* Returns the current thread's priority. */
+/* 현재 thread의 우선순위를 반환 */
 int
 thread_get_priority (void) {
 	return thread_current ()->priority;
@@ -776,6 +774,7 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+
 }
 
 bool cmp_donation_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)

@@ -51,8 +51,7 @@ sema_init (struct semaphore *sema, unsigned value) {
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. This is
    sema_down function. */
-void
-sema_down (struct semaphore *sema) {
+void sema_down (struct semaphore *sema) {
 	enum intr_level old_level;
 
 	ASSERT (sema != NULL);
@@ -66,9 +65,7 @@ sema_down (struct semaphore *sema) {
 
 		list_insert_ordered(&sema->waiters, &thread_current ()->elem, &cmp_priority,NULL);
 		thread_block ();
-		// sema->value++; // 재확인
 	}
-	// schedule(); // 재확인
 	sema->value--;
 	intr_set_level (old_level);
 }
@@ -147,7 +144,6 @@ sema_self_test (void) {
 	}
 	printf ("done.\n");
 }
-
 
 /* Thread function used by sema_self_test(). */
 static void
