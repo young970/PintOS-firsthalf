@@ -50,6 +50,10 @@
 
 /* Returns physical address at which kernel virtual address VADDR
  * is mapped. */
+
+// 추가 함수 및 매크로
+
+
 #define vtop(vaddr) \
 ({ \
 	ASSERT(is_kernel_vaddr(vaddr)); \

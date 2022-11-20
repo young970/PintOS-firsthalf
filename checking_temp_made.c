@@ -593,6 +593,8 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+<<<<<<< HEAD
+=======
 // /* Thread sleep과 awake 구현 */
 // void thread_sleep(int64_t ticks);
 // void thread_awake(int64_t ticks);
@@ -600,6 +602,7 @@ static tid_t allocate_tid (void);
 // int64_t get_next_tick_to_awake(void);
 
 
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -755,6 +758,12 @@ thread_create (const char *name, int priority,
 	/* 갈까? */
 	test_max_priority();
 
+<<<<<<< HEAD
+	if (cmp_priority(&t->elem, list_back(&ready_list),0)){
+		1;
+	}
+=======
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	/* 성심당 가자 */
 	// struct thread* curr = thread_current();
 	// if (cmp_priority(&t->elem, &curr->elem, NULL))
@@ -762,6 +771,7 @@ thread_create (const char *name, int priority,
 
 	return tid;
 }
+
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -793,9 +803,16 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
+<<<<<<< HEAD
+	
+	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
+	/* 갈끼? */
+
+=======
 
 	/* 스레드가 unblock 될 때 우선순위 순으로 정렬 되어 ready_list에 삽입되도록 수정 */
 	/* 갈까? */
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 
@@ -806,16 +823,28 @@ thread_unblock (struct thread *t) {
 			break;
 		swap_priority(new_ele,new_ele->prev);
 	}
+<<<<<<< HEAD
+
 	// 유성 순대군 가자
 	// list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
 	// t->status = THREAD_READY;
+
+=======
+	// 유성 순대군 가자
+	// list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	// t->status = THREAD_READY;
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	intr_set_level (old_level);
 }
 
 void swap_priority(struct list_elem* new_ele, struct list_elem* new_ele_prev){
 	ASSERT (new_ele);
 	ASSERT (new_ele_prev);
+<<<<<<< HEAD
+	
+=======
 
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	struct list_elem* right = new_ele->next;
 	struct list_elem* left = new_ele_prev->prev;
 
@@ -843,7 +872,11 @@ thread_sleep(int64_t ticks){ // 깨울 시간
 	if (curr != idle_thread){ // curr이 처음 ready에 있는 idle thread가 아닐시
 		list_push_back(&sleep_list, &(curr->elem));
 	}
+<<<<<<< HEAD
+	update_next_tick_to_awake(ticks); 	
+=======
 	update_next_tick_to_awake(ticks);
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	do_schedule(THREAD_BLOCKED);
 
 	intr_set_level (old_level);
@@ -859,7 +892,11 @@ thread_awake(int64_t ticks){ // 현재시간
 	for (e= list_begin(&sleep_list); e != list_end(&sleep_list);){
 		struct thread* wakeThread = list_entry(e, struct thread, elem);
 		if (wakeThread->tick <= ticks) // 현재 시간이 thread의 tick보다 크거나 같다면
+<<<<<<< HEAD
+		{	
+=======
 		{
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 			e = list_remove(e); // 슬립 큐에서 제거하고 next를 위해 변수 저장
 			thread_unblock(wakeThread); // unblock
 
@@ -873,7 +910,11 @@ thread_awake(int64_t ticks){ // 현재시간
 
 void update_next_tick_to_awake(int64_t ticks){ // 현재 시간
 	/* next_tick_to_awake가 깨워야 할 스레드 중 가장 작은 tick를 갖도록 업데이트 한다 */
+<<<<<<< HEAD
+	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;	
+=======
 	next_tick_to_awake = (ticks < next_tick_to_awake) ? ticks : next_tick_to_awake;
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 }
 
 int64_t get_next_tick_to_awake(void){
@@ -886,6 +927,31 @@ void test_max_priority(void)
 	/* ready_list에서 우선순위가 가장 높은 스레드와 현재 스레드의
 		우선순위를 비교하여 스케쥴링 한다. (ready_list가 비어있지 않은지 확인) */
 	/* 갈까? */
+<<<<<<< HEAD
+
+	struct thread* curr = thread_current(); // 현재 쓰레드 반환
+	struct list_elem* max_ele = list_begin(&ready_list); 
+	struct thread* max_thread = list_entry(max_ele, struct thread, elem);
+
+	if (!list_empty(&ready_list)){
+		if (curr->priority < max_thread->priority){
+			list_push_back(&sleep_list, &(curr->elem));	
+			do_schedule(THREAD_BLOCKED);
+	}}
+	
+	/* 어니언 키친 가자 */
+	// if (list_empty(&ready_list)) {
+	// 	return;
+	// }
+
+	// int run_priority = thread_current()->priority;
+	// struct list_elem *e = list_begin(&ready_list);
+	// struct thread *t = list_entry(e, struct thread, elem);
+
+	// if (t->priority > run_priority) {
+	// 	thread_yield();
+	// }
+=======
 	// ASSERT (thread_current());
 
 	// enum intr_level old_level = intr_disable(); // interrupt disable
@@ -913,15 +979,20 @@ void test_max_priority(void)
 	if (t->priority > run_priority) {
 		thread_yield();
 	}
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	return;
 }
 
 bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* aux UNUSED)
 {
 	/* list_insert_ordered() 함수에서 사용 하기 위해 정렬 방법을 결정하기 위한 함수 */
+<<<<<<< HEAD
+	
+=======
 	ASSERT (a_ != NULL);
 	ASSERT (b_ != NULL);
 
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	struct thread* a_thread = list_entry(a_, struct thread, elem);
 	struct thread* b_thread = list_entry(b_, struct thread, elem);
 	if (a_thread->priority > b_thread->priority)
@@ -987,6 +1058,24 @@ thread_yield (void) {
 
 	old_level = intr_disable ();
 
+<<<<<<< HEAD
+	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때 
+		우선순위 순서로 정렬되어 삽입 되도록 수정 */
+	/* 갈까? */
+	if (curr != idle_thread)
+		list_push_back (&ready_list, &curr->elem);
+
+		struct list_elem* new_ele = &(curr->elem);
+
+		while (cmp_priority(new_ele, new_ele->prev,0)){
+			if (new_ele->prev->prev == NULL)
+				break;
+			
+			swap_priority(new_ele,new_ele->prev);
+
+		/* 학식 가즈아 */
+		// list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
+=======
 	/* 현재 thread가 CPU를 양보하여 ready_list에 삽입 될 때
 		우선순위 순서로 정렬되어 삽입 되도록 수정 */
 	/* 갈까? */
@@ -1002,6 +1091,7 @@ thread_yield (void) {
 	// 	swap_priority(new_ele,new_ele->prev);
 		/* 학식 가즈아 */
 		list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
 	}
 
 	do_schedule (THREAD_READY);
@@ -1296,6 +1386,8 @@ allocate_tid (void) {
 
 	return tid;
 }
+<<<<<<< HEAD
+=======
 
 
 #include "list.h"
@@ -1788,3 +1880,4 @@ list_min (struct list *list, list_less_func *less, void *aux) {
 	}
 	return min;
 }
+>>>>>>> b6d3207eabe7d6fed94f7a71fe5be4ecbdb87040
