@@ -27,11 +27,6 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-
-/* Parsing Function 임시 코드 - 김채욱 */
-int parsing_str(char *file_name, char* argv[]);
-void argument_stack(char **parse , int count , void **esp);
-
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -71,7 +66,7 @@ parsing_str(char *file_name, char* argv[]){
 	// 토큰 변수, 포인터 - 김채욱
 	char *token, *save_ptr;
 	int i = 0;
-
+	// 0 grep 1 foo 2 bar 3 \0 
 	for (token = strtok_r (file_name, " ", &save_ptr); 
 		token != NULL;
 		token = strtok_r (NULL, " ", &save_ptr))
@@ -80,7 +75,7 @@ parsing_str(char *file_name, char* argv[]){
 			i++;
 		}
 	argv[i] = "\0";
-	return i;
+	return i; 
 }
 
 /* A thread function that launches first user process. */
@@ -228,23 +223,31 @@ void argument_stack(char **parse , int count , void **esp)
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
 	/* argc (문자열의 개수 저장) push */
 	/* fake address(0) 저장 */
-
-	int i, j;
+	char** esp_adr[100];
+	int i, j,k = 0;
 	for(i = count - 1 ; i > -1 ; i--)
 	{
 		*esp = *esp - 1;
 		for(j = 0 ; j < strlen(parse[i]) ; j++)
 		{
-			strcat(**(char **)esp, parse[i][j]);
-			// **(char **)esp = parse[i][j];
+			strlcat(**(char **)esp, parse[i][j],strlen(parse[i]));
+			//**(char **)esp = parse[i][j];
 		}
+		esp_adr[k] = &esp;
+		k++;
 	}
 
-	for(i = count - 1; i > -1; i--)
+	for (i = 0 ;i > -1 ; i--)
 	{
 		*esp = *esp - 1;
-		**(char **)esp = &parse[i];
+		**(char **)esp = esp_adr[i];
 	}
+
+	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
+	*esp--;
+	**(char **)esp = *(esp+1);
+	*esp--;
+	**(char **)esp = count;
 
 	// 마지막에 fake address를 저장한다
 	**(char **)esp = 0;
