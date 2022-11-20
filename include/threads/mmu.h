@@ -26,6 +26,8 @@ void pml4_set_accessed (uint64_t *pml4, const void *upage, bool accessed);
 
 #define pte_get_paddr(pte) (pg_round_down(*(pte)))
 
+// 추가 함수 및 매크로
+
 /* Segment descriptors for x86-64. */
 struct desc_ptr {
 	uint16_t size;

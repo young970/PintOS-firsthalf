@@ -27,6 +27,11 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+
+/* Parsing Function 임시 코드 - 김채욱 */
+int parsing_str(const char *file_name, char* argv[]);
+void argument_stack(char **parse , int count , void **esp);
+
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -50,11 +55,34 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char* argv[101];
+	
+	parsing_str(file_name, argv);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
+}
+
+int
+parsing_str(const char *file_name, char* argv[]){
+	// 토큰 변수, 포인터 - 김채욱
+	char *token, *save_ptr;
+	int i = 0;
+
+	for (token = strtok_r (file_name, " ", &save_ptr); 
+		token != NULL;
+		token = strtok_r (NULL, " ", &save_ptr))
+		{
+			argv[i] = token;
+			if (i > 100)
+				break;
+			i++;
+		}
+	argv[i] = "\0";
+	return ++i;
 }
 
 /* A thread function that launches first user process. */
@@ -173,20 +201,48 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
+	char* argv[101];
+	int count;
+	count = parsing_str(file_name, argv);
+
+	argument_stack(argv[0],count,_if.rsp);
+
 	/* We first kill the current context */
 	process_cleanup ();
 
 	/* And then load the binary */
-	success = load (file_name, &_if);
+	success = load (argv[0], &_if);
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
+	palloc_free_page (argv[0]);
 	if (!success)
 		return -1;
 
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
+}
+
+void argument_stack(char **parse , int count , void **esp)
+{
+	/* 프로그램 이름 및 인자(문자열) push */
+	/* 프로그램 이름 및 인자 주소들 push */
+	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
+	/* argc (문자열의 개수 저장) push */
+	/* fake address(0) 저장 */
+
+	int i, j;
+	for(i = count - 1 ; i > -1 ; i--)
+	{
+		for(j = strlen(parse[i]) ; j > -1 ; j--)
+		{
+			*esp = *esp - 1;
+			**(char **)esp = parse[i][j];
+		}
+	}
+
+	// 마지막에 fake address를 저장한다
+	**(char **)esp = 0;
 }
 
 
