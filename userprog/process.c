@@ -234,19 +234,16 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	{
 		if_->rsp = if_->rsp - strlen(argv[i]) - 1;
 		rsp_adr[i] = if_->rsp;
-		printf("rsp 주소 : %ld\n", if_->rsp);
 		// strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
 		// *(char *)if_->rsp = parse[i][j];
 		memcpy(if_->rsp, argv[i], strlen(argv[i]) + 1);
 	}
-	printf("-----------------------------------------------------\n");
 	// rsp(16진수)를 8의 배수로 체크하고 맞춤
 	while (if_->rsp % 8 != 0)
 	{
 		if_->rsp--;
 		// *(uint8_t*) if_->rsp = 0; // 이거 써도 됨
 		memset(if_->rsp, 0, sizeof(char)); //char*가 아니라 char로 해줘야 함
-		printf("rsp 주소 2 : %ld\n", if_->rsp);
 	}
 	
 	/* 프로그램 이름 및 인자 주소들 push */
