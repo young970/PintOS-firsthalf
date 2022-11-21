@@ -50,32 +50,32 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
-	char* argv[100];
-	
-	parsing_str(fn_copy, argv);
+	char *save_ptr;
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);  //배열은 전역변수로 선언 안해도 전역변수로 쓰이는가??
+	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);  //배열은 전역변수로 선언 안해도 전역변수로 쓰이는가??
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
 }
 
+/* count null 미포함. 확인 필요 */
 int
 parsing_str(char *file_name, char* argv[]){
 	// 토큰 변수, 포인터 - 김채욱
 	char *token, *save_ptr;
-	int i = 0;
+	int count = 0; 
 	// 0 grep 1 foo 2 bar 3 \0 
 	for (token = strtok_r (file_name, " ", &save_ptr); 
 		token != NULL;
 		token = strtok_r (NULL, " ", &save_ptr))
 		{
-			argv[i] = token;
-			i++;
+			argv[count] = token;
+			count++;
 		}
-	argv[i] = "\0";
-	return i; 
+	//argv[count] = "\0";
+	return count; // \0을 포함한 개수를 셈
 }
 
 /* A thread function that launches first user process. */
@@ -189,84 +189,91 @@ process_exec (void *f_name) {
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-	struct intr_frame _if;                   // 너 1순위 후보야
+	struct intr_frame _if;                   
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 
-	char* argv[101];
-	int count;
-	count = parsing_str(file_name, argv);
-	_if.R.rsi = argv;
-	_if.R.rdi = count;
+
 	/* We first kill the current context */
 	process_cleanup ();
 
+	// 안쓰는 변수 선언해서 버그 발생 
+	// char fn_copy[128];
+	// memcpy(fn_copy, file_name, strlen(file_name) + 1);
+
 	/* And then load the binary */
-	success = load (argv[0], &_if);
+	success = load (file_name, &_if); // 복사한 전체 파일 인자로 넣음.
 
 	/* If load failed, quit. */
-	palloc_free_page (argv[0]);
+	palloc_free_page (file_name);
 	if (!success)
 		return -1;
+
+	// 디버깅
+	void** rsapp = &_if.rsp;
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
 }
 
-void argument_stack(char **parse , int count , void **rsp)
+void argument_stack(char **argv, int count, struct intr_frame* if_)
 {
 	/* 프로그램 이름 및 인자(문자열) push */
 	/* 프로그램 이름 및 인자 주소들 push */
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
 	/* argc (문자열의 개수 저장) push */
 	/* fake address(0) 저장 */
-	char** rsp_adr[100];
-	int i, j, k = 0;
+	char* rsp_adr[128];
+	int i, j;
 
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
-		for(j = strlen(parse[i]); j > -1; j--)
-		{
-			*rsp = *rsp - 1;
-			//strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
-			**(char **)rsp = parse[i][j];
-		}
-		rsp_adr[k] = &rsp;
-		k++;
+		if_->rsp = if_->rsp - strlen(argv[i]) - 1;
+		rsp_adr[i] = if_->rsp;
+		printf("rsp 주소 : %ld\n", if_->rsp);
+		// strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
+		// *(char *)if_->rsp = parse[i][j];
+		memcpy(if_->rsp, argv[i], strlen(argv[i]) + 1);
 	}
-
+	printf("-----------------------------------------------------\n");
 	// rsp(16진수)를 8의 배수로 체크하고 맞춤
-	char Hex[17];
-	snprintf(Hex, strlen(*rsp), *rsp);
-
-	int word_align = *(char *)rsp % 8;
-	if (word_align != 0)
-		for (word_align; word_align <0; word_align--){
-			*rsp = *rsp - 1;
-			**(char**)rsp = 0;
-		}
-	
-
-
-	/* 프로그램 이름 및 인자 주소들 push */
-	for (i = strlen(rsp_adr); i > -1; i--)
+	while (if_->rsp % 8 != 0)
 	{
-		*rsp = *rsp - 8;
-		**(char **)rsp = rsp_adr[i];
+		if_->rsp--;
+		// *(uint8_t*) if_->rsp = 0; // 이거 써도 됨
+		memset(if_->rsp, 0, sizeof(char)); //char*가 아니라 char로 해줘야 함
+		printf("rsp 주소 2 : %ld\n", if_->rsp);
+	}
+	
+	/* 프로그램 이름 및 인자 주소들 push */
+	for (i = 0; i < strlen(rsp_adr); i++)
+	{
+		if_->rsp = if_->rsp - 8;
+		if(i == 0){
+			memset(if_->rsp, 0, sizeof(char*));
+		} else {
+			memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
+		}
+		// *(char *)if_->rsp = rsp_adr[i];
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
-	*rsp = *rsp-8;
-	**(char **)rsp = *(rsp+1);        // pg_round_down(va) 써야함.
-	*rsp = *rsp-8;
-	**(char **)rsp = count;
-	
+	// if_->rsp = if_->rsp - 8;
+	// memcpy(if_->rsp, &rsp_adr[-1], sizeof(char*));
+
+	// if_->rsp = if_->rsp - 8;
+	// memcpy(if_->rsp, count, count);
+
 	// 마지막에 fake address를 저장한다
-	*rsp = *rsp-8;
-	**(char **)rsp = (void*)0;
+	if_->rsp = if_->rsp - 8 ;
+	memset(if_->rsp, 0, sizeof(void*));
+
+	if_->R.rsi = if_->rsp + 8;
+	if_->R.rdi = count;
 }
 
 
@@ -289,6 +296,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	thread_set_priority(thread_get_priority()-1);
 	return -1;
 }
 
@@ -413,7 +421,10 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-	uint64_t count = if_->R.rdi;
+
+	char* argv[128];
+	int count = parsing_str(file_name, argv);
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create (); // 페이지 디렉토리 생성
 	if (t->pml4 == NULL)
@@ -505,7 +516,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	argument_stack(file_name[0],count, &if_->rsp);
+	argument_stack(argv, count, if_);
 
 	success = true;
 
