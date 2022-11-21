@@ -197,6 +197,8 @@ process_exec (void *f_name) {
 	char* argv[101];
 	int count;
 	count = parsing_str(file_name, argv);
+	_if.R.rsi = argv;
+	_if.R.rdi = count;
 
 	argument_stack(argv[0],count,_if.rsp);
 
@@ -216,41 +218,41 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-void argument_stack(char **parse , int count , void **esp)
+void argument_stack(char **parse , int count , void **rsp)
 {
 	/* 프로그램 이름 및 인자(문자열) push */
 	/* 프로그램 이름 및 인자 주소들 push */
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
 	/* argc (문자열의 개수 저장) push */
 	/* fake address(0) 저장 */
-	char** esp_adr[100];
-	int i, j,k = 0;
+	char** rsp_adr[100];
+	int i, j, k = 0;
 	for(i = count - 1 ; i > -1 ; i--)
 	{
-		*esp = *esp - 1;
-		for(j = 0 ; j < strlen(parse[i]) ; j++)
+		for(j = strlen(parse[i]) ; j > -1 ; j--)
 		{
-			strlcat(**(char **)esp, parse[i][j],strlen(parse[i]));
-			//**(char **)esp = parse[i][j];
+			*rsp = *rsp - 1;
+			// strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
+			**(char **)rsp = parse[i][j];
 		}
-		esp_adr[k] = &esp;
+		rsp_adr[k] = &rsp;
 		k++;
 	}
 
 	for (i = 0 ;i > -1 ; i--)
 	{
-		*esp = *esp - 1;
-		**(char **)esp = esp_adr[i];
+		*rsp = *rsp - 1;
+		**(char **)rsp = rsp_adr[i];
 	}
 
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
-	*esp--;
-	**(char **)esp = *(esp+1);
-	*esp--;
-	**(char **)esp = count;
+	*rsp--;
+	**(char **)rsp = *(rsp+1);
+	*rsp--;
+	**(char **)rsp = count;
 
 	// 마지막에 fake address를 저장한다
-	**(char **)esp = 0;
+	**(char **)rsp = 0;
 }
 
 
@@ -263,6 +265,11 @@ void argument_stack(char **parse , int count , void **esp)
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
+/* 자식 스레드(child_tid)가 종료될 때 까지 대기하다가 종료상태를 반환
+	커널에 의해 종료된 경우 -1을 반환 child_tid가 잘못되었거나, 호출 프로세스의
+	하위 항목이 아니거나, 지정된 child_tid에 대해 process_wait가 이미 호출된
+	경우 -1을 즉시 반환.
+	이 기능은 2-2에서 구현 */
 int
 process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you

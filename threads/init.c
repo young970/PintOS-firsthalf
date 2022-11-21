@@ -71,39 +71,43 @@ main (void) {
 	char **argv;
 
 	/* Clear BSS and get machine's RAM size. */
+	/* 커널의 bss를 장치의 RAM 사이즈로 초기화 */
 	bss_init ();
 
 	/* Break command line into arguments and parse options. */
-	argv = read_command_line ();
-	argv = parse_options (argv);
+	argv = read_command_line (); // 커널의 커맨드 라인을 읽어와서 arguments로 나눔
+	argv = parse_options (argv); // 커맨드 라인에서 options를 읽어옴
 
 	/* Initialize ourselves as a thread so we can use locks,
 	   then enable console locking. */
-	thread_init ();
-	console_init ();
+	thread_init (); // 스레드 초기화
+	console_init (); /* 콘솔 초기화(콘솔 초기화 이후 printf()사용 가능)
+						lock_init() 수행 */
 
 	/* Initialize memory system. */
-	mem_end = palloc_init ();
-	malloc_init ();
-	paging_init (mem_end);
+	mem_end = palloc_init (); // page allocator를 초기화 하고 메모리 사이즈를 반환
+	malloc_init (); // malloc 디스크립터 초기화(사용자 메모리 할당이 가능하게 설정)
+	paging_init (mem_end); // loader.S에서 구성했던 페이지 테이블을 다시 구성한다.
 
 #ifdef USERPROG
-	tss_init ();
-	gdt_init ();
+	tss_init (); // (task state segment)를 설정한다. 커널이 task를 관리할 때 필요한 정보가 들어있는 segment이다.
+	gdt_init (); // (global description table)을 초기화한다. 커널이 task를 관리할 때 필요한 정보가 들어있는 table이다.
 #endif
 
 	/* Initialize interrupt handlers. */
-	intr_init ();
-	timer_init ();
-	kbd_init ();
-	input_init ();
+	/* 인터럽트 핸들러 초기화 */
+	intr_init (); // (interrupt descriptor table)초기화. 이 table은 인터럽트를 handling하는 handler 함수들이 연결되는 table.
+	timer_init (); // 타이머 인터럽트 초기화
+	kbd_init (); // 키보드 인터럽트 초기화
+	input_init (); // input 모듈 초기화
 #ifdef USERPROG
-	exception_init ();
-	syscall_init ();
+	exception_init (); // 예외처리 인터럽트 초기화
+	syscall_init (); // system call 인터럽트 초기화
 #endif
 	/* Start thread scheduler and enable interrupts. */
-	thread_start ();
-	serial_init_queue ();
+	/* 스레드 스케줄러를 시작하고 인터럽트를 사용 */
+	thread_start (); // 가장 실행 순위가 낮은 idle 스레드를 생성해 동작시키고 인터럽트를 활성화시킴.
+	serial_init_queue (); // serial로 부터 인터럽트를 받아 커널을 제
 	timer_calibrate ();
 
 #ifdef FILESYS
@@ -235,6 +239,8 @@ parse_options (char **argv) {
 }
 
 /* Runs the task specified in ARGV[1]. */
+/* argv[1]에 지정된 작업을 실행
+	유저 프로세스 생성 후 핀토스 종료 대기 */
 static void
 run_task (char **argv) {
 	const char *task = argv[1];
@@ -254,6 +260,8 @@ run_task (char **argv) {
 
 /* Executes all of the actions specified in ARGV[]
    up to the null pointer sentinel. */
+/* argv에 지정된 모든 액션을 null포인터 센티넬('\0')까지 실행 */
+/* 테스트 프로그램을 실행하는 함수 */
 static void
 run_actions (char **argv) {
 	/* An action. */
@@ -265,7 +273,7 @@ run_actions (char **argv) {
 
 	/* Table of supported actions. */
 	static const struct action actions[] = {
-		{"run", 2, run_task},
+		{"run", 2, run_task}, /* run옵션(응용 프로그램 실행)일 경우 run_task 호출 */
 #ifdef FILESYS
 		{"ls", 1, fsutil_ls},
 		{"cat", 2, fsutil_cat},
