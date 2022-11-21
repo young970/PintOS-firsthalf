@@ -65,17 +65,17 @@ int
 parsing_str(char *file_name, char* argv[]){
 	// 토큰 변수, 포인터 - 김채욱
 	char *token, *save_ptr;
-	int i = 0;
+	int count = 0; 
 	// 0 grep 1 foo 2 bar 3 \0 
 	for (token = strtok_r (file_name, " ", &save_ptr); 
 		token != NULL;
 		token = strtok_r (NULL, " ", &save_ptr))
 		{
-			argv[i] = token;
-			i++;
+			argv[count] = token;
+			count++;
 		}
-	argv[i] = "\0";
-	return i; 
+	//argv[count] = "\0";
+	return count; // \0을 포함한 개수를 셈
 }
 
 /* A thread function that launches first user process. */
@@ -189,7 +189,7 @@ process_exec (void *f_name) {
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-	struct intr_frame _if;                   // 너 1순위 후보야
+	struct intr_frame _if;                   
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
@@ -203,7 +203,7 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
-	success = load (argv[0], &_if);
+	success = load (argv[0], &_if); // 복사한 전체 파일 인자로 넣음.
 
 	/* If load failed, quit. */
 	palloc_free_page (argv[0]);
@@ -215,14 +215,14 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-void argument_stack(char **parse , int count , void **rsp)
+void argument_stack(char **parse , int count , void *rsp)
 {
 	/* 프로그램 이름 및 인자(문자열) push */
 	/* 프로그램 이름 및 인자 주소들 push */
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
 	/* argc (문자열의 개수 저장) push */
 	/* fake address(0) 저장 */
-	char** rsp_adr[100];
+	char* rsp_adr[100];
 	int i, j,k = 0;
 
 	/* 프로그램 이름 및 인자(문자열) push */
@@ -230,43 +230,42 @@ void argument_stack(char **parse , int count , void **rsp)
 	{
 		for(j = strlen(parse[i]) ; j > -1 ; j--)
 		{
-			*rsp = *rsp - 1;
+			rsp = rsp - 1;
 			//strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
-			**(char **)rsp = parse[i][j];
+			*(char *)rsp = parse[i][j];
 		}
-		rsp_adr[k] = &rsp;
+		rsp_adr[k] = rsp;
 		k++;
 	}
 
 	// rsp(16진수)를 8의 배수로 체크하고 맞춤
 	char Hex[17];
-	sprintf(Hex, *rsp);
+	snprintf(Hex,strlen(rsp),rsp);
 
-	int word_align = (int)strtol(Hex,NULL,16)%8;
+	int word_align = rsp % 0x4;
 	if (word_align != 0)
 		for (word_align; word_align <0; word_align--){
-			*rsp = *rsp - 1;
-			**(char**)rsp = 0;
+			rsp = rsp - 1;
+			*(char*)rsp = 0;
 		}
 	
-
 
 	/* 프로그램 이름 및 인자 주소들 push */
 	for (i = strlen(rsp_adr) ;i > -1 ; i--)
 	{
-		*rsp = *rsp - 8;
-		**(char **)rsp = rsp_adr[i];
+		rsp = rsp - 8;
+		*(char *)rsp = rsp_adr[i];
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
-	*rsp = *rsp-8 ;
-	**(char **)rsp = *(rsp+1);        // pg_round_down(va) 써야함.
-	*rsp = *rsp-8 ;
-	**(char **)rsp = count;
+	rsp = rsp-8 ;
+	*(char *)rsp = (rsp+1);        // pg_round_down(va) 써야함.
+	rsp = rsp-8 ;
+	*(char *)rsp = count;
 	
 	// 마지막에 fake address를 저장한다
-	*rsp = *rsp-8 ;
-	**(char **)rsp = (void*)0 ;
+	rsp = rsp-8 ;
+	*(char *)rsp = (void*)0 ;
 }
 
 
@@ -408,7 +407,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-	uint64_t count = if_->R.rdi
+	uint64_t count = if_->R.rdi;    // 우니 식대로 수정하면 지워야 함.              
+	/* 우니는 여기서 파싱함.*/
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -496,7 +497,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	argument_stack(file_name[0],count, if_->rsp);
+	argument_stack(file_name[0],count, &if_->rsp);
 
 	success = true;
 
