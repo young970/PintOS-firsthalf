@@ -27,11 +27,6 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
-
-/* Parsing Function 임시 코드 - 김채욱 */
-int parsing_str(char *file_name, char* argv[]);
-void argument_stack(char **parse , int count , void **esp);
-
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -60,7 +55,7 @@ process_create_initd (const char *file_name) {
 	parsing_str(fn_copy, argv);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (argv[0], PRI_DEFAULT, initd, fn_copy);  //배열은 전역변수로 선언 안해도 전역변수로 쓰이는가??
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
 	return tid;
@@ -194,7 +189,7 @@ process_exec (void *f_name) {
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-	struct intr_frame _if;
+	struct intr_frame _if;                   // 너 1순위 후보야
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
@@ -202,9 +197,8 @@ process_exec (void *f_name) {
 	char* argv[101];
 	int count;
 	count = parsing_str(file_name, argv);
-
-	argument_stack(argv[0],count,_if.rsp);
-
+	_if.R.rsi = argv;
+	_if.R.rdi = count;
 	/* We first kill the current context */
 	process_cleanup ();
 
@@ -221,41 +215,58 @@ process_exec (void *f_name) {
 	NOT_REACHED ();
 }
 
-void argument_stack(char **parse , int count , void **esp)
+void argument_stack(char **parse , int count , void **rsp)
 {
 	/* 프로그램 이름 및 인자(문자열) push */
 	/* 프로그램 이름 및 인자 주소들 push */
 	/* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
 	/* argc (문자열의 개수 저장) push */
 	/* fake address(0) 저장 */
-	char** esp_adr[100];
+	char** rsp_adr[100];
 	int i, j,k = 0;
-	for(i = count - 1 ; i > -1 ; i--)
+
+	/* 프로그램 이름 및 인자(문자열) push */
+	for(i = count - 1 ; i > -1 ; i--) 
 	{
-		*esp = *esp - 1;
-		for(j = 0 ; j < strlen(parse[i]) ; j++)
+		for(j = strlen(parse[i]) ; j > -1 ; j--)
 		{
-			strlcat(**(char **)esp, parse[i][j],strlen(parse[i]));
-			//**(char **)esp = parse[i][j];
+			*rsp = *rsp - 1;
+			//strlcat(**(char **)rsp, parse[i][j],strlen(parse[i]));
+			**(char **)rsp = parse[i][j];
 		}
-		esp_adr[k] = &esp;
+		rsp_adr[k] = &rsp;
 		k++;
 	}
 
-	for (i = 0 ;i > -1 ; i--)
+	// rsp(16진수)를 8의 배수로 체크하고 맞춤
+	char Hex[17];
+	sprintf(Hex, *rsp);
+
+	int word_align = (int)strtol(Hex,NULL,16)%8;
+	if (word_align != 0)
+		for (word_align; word_align <0; word_align--){
+			*rsp = *rsp - 1;
+			**(char**)rsp = 0;
+		}
+	
+
+
+	/* 프로그램 이름 및 인자 주소들 push */
+	for (i = strlen(rsp_adr) ;i > -1 ; i--)
 	{
-		*esp = *esp - 1;
-		**(char **)esp = esp_adr[i];
+		*rsp = *rsp - 8;
+		**(char **)rsp = rsp_adr[i];
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
-	*esp--;
-	**(char **)esp = *(esp+1);
-	*esp--;
-	**(char **)esp = count;
-
+	*rsp = *rsp-8 ;
+	**(char **)rsp = *(rsp+1);        // pg_round_down(va) 써야함.
+	*rsp = *rsp-8 ;
+	**(char **)rsp = count;
+	
 	// 마지막에 fake address를 저장한다
-	**(char **)esp = 0;
+	*rsp = *rsp-8 ;
+	**(char **)rsp = (void*)0 ;
 }
 
 
@@ -397,7 +408,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	off_t file_ofs;
 	bool success = false;
 	int i;
-
+	uint64_t count = if_->R.rdi
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
@@ -485,6 +496,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	argument_stack(file_name[0],count, if_->rsp);
 
 	success = true;
 
