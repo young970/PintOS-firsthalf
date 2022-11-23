@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -111,6 +112,15 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
+	
+	/* 추가 멤버 변수 */
+	// struct thread* parent;
+	// struct list_elem child_elem;
+	// struct list childs;
+
+	// struct semaphore exit_sema;
+	// struct semaphore load_sema;
+	// int exit_status;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
