@@ -113,14 +113,14 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	
-	/* 추가 멤버 변수 */
+	/* 추가 멤버 변수 (나중에 USERPROG 안에 넣을 것) */
 	// struct thread* parent;
 	// struct list_elem child_elem;
 	// struct list childs;
 
 	// struct semaphore exit_sema;
 	// struct semaphore load_sema;
-	// int exit_status;
+	int exit_status;
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */

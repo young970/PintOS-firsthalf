@@ -216,7 +216,7 @@ process_exec (void *f_name) {
 
 	// 디버깅
 	void** rsapp = &_if.rsp;
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	// printf("RSP: %s\n", _if.rsp);
 	// printf("RDI: %s\n", _if.R.rdi);
 	// printf("RSI: %s\n", _if.R.rsi);
@@ -235,7 +235,6 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	/* fake address(0) 저장 */
 	char* rsp_adr[128];
 	int i, j;
-	printf("Count: %d\n",count);
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
@@ -259,13 +258,12 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	memset(if_->rsp, 0, sizeof(char*));
 
 	/* 프로그램 이름 및 인자 주소들 push */
-	for (i = count-1; i >= 0; i--)
+	for (i = count - 1; i >= 0; i--)
 	{
 		if_->rsp = if_->rsp - 8;
 		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
 		
 		// *(char *)if_->rsp = rsp_adr[i];
-		printf("Address: %x\n",rsp_adr[i]);
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
@@ -335,6 +333,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 
 	process_cleanup();
 }

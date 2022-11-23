@@ -48,91 +48,91 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 
-	// uintptr_t rsp = f->rsp;
+	uintptr_t rsp = f->rsp;
 	/* 유저 스택에 저장되어 있는 시스템 콜 넘버를 이용해 시스템 콜 핸들러 구현 */
 	/* 스택 포인터가 유저 영역인지 확인 */
-	// check_address(rsp);
+	check_address(rsp);
 	/* 저장된 인자 값이 포인터일 경우 유저 영역의 주소인지 확인 */
 	/* 확인 요망 (rax 값) */
-	// switch (f->R.rax)
-	// {
-// 	case SYS_HALT:
-// 		halt();
-// 		break;
+	switch (f->R.rax)
+	{
+	case SYS_HALT:
+		halt();
+		break;
 	
-	// case SYS_EXIT:
-	// 	exit(f->R.rdi);
+	case SYS_EXIT:
+		exit(f->R.rdi);
+		break;
+
+	// case SYS_FORK:
+	// 	fork();
 	// 	break;
 
-// 	case SYS_FORK:
-// 		fork();
-// 		break;
-
-// 	case SYS_EXEC:
-// 		exec();
-// 		break;
-
-// 	case SYS_WAIT:
-// 		wait();
-// 		break;
-
-// 	case SYS_CREATE:
-// 		create();
-// 		break;
-	
-// 	case SYS_REMOVE:
-// 		remove();
-// 		break;
-
-// 	case SYS_OPEN:
-// 		open();
-// 		break;
-
-// 	case SYS_FILESIZE:
-// 		filesize();
-// 		break;
-
-// 	case SYS_READ:
-// 		read();
-// 		break;
-		
-	// case SYS_WRITE:
-	// 	f->R.rax = write();
+	// case SYS_EXEC:
+	// 	exec();
 	// 	break;
 
-// 	case SYS_SEEK:
-// 		seek();
-// 		break;
+	// case SYS_WAIT:
+	// 	wait();
+	// 	break;
 
-// 	case SYS_TELL:
-// 		tell();
-// 		break;
+	case SYS_CREATE:
+		create(f->R.rdi, f->R.rsi);
+		break;
+	
+	case SYS_REMOVE:
+		remove(f->R.rdi);
+		break;
 
-// 	case SYS_CLOSE:
-// 		close();
-// 		break;
+	// case SYS_OPEN:
+	// 	open();
+	// 	break;
+
+	// case SYS_FILESIZE:
+	// 	filesize();
+	// 	break;
+
+	// case SYS_READ:
+	// 	read();
+	// 	break;
 		
-// 	default:
-// 		break;
-	// }
+	case SYS_WRITE:
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
+
+	// case SYS_SEEK:
+	// 	seek();
+	// 	break;
+
+	// case SYS_TELL:
+	// 	tell();
+	// 	break;
+
+	// case SYS_CLOSE:
+	// 	close();
+	// 	break;
+		
+	default:
+		break;
+	}
 	/* 0 : halt */
 	/* 1 : exit */
 	/* . . . */
 
-	printf ("system call!\n");
-	thread_exit ();
+	// printf ("system call!\n");
+	// thread_exit ();
 }
 
-// void check_address(void *addr)
-// {
-// 	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인 */
-// 	if (!is_user_vaddr(addr))
-// 	{
-// 		/* 잘못된 접근일 경우 프로세스 종료 */
-// 		/* 확인 요망 */
-// 		process_exit();
-// 	}
-// }
+void check_address(void *addr)
+{
+	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인 */
+	if (!is_user_vaddr(addr))
+	{
+		/* 잘못된 접근일 경우 프로세스 종료 */
+		/* 확인 요망 */
+		exit(-1);
+	}
+}
 
 // void get_argument(uintptr_t rsp, int *arg, int count)
 // {
@@ -149,94 +149,105 @@ syscall_handler (struct intr_frame *f UNUSED) {
 // 	}
 // }
 
-// /* 확인 요망 */
-// void halt(void)
-// {
-// 	/* PintOS를 종료시키는 시스템 콜 */
-// 	power_off();
-// }
+/* 확인 요망 */
+void halt(void)
+{
+	/* PintOS를 종료시키는 시스템 콜 */
+	power_off();
+}
 
-// /* 확인 요망 */
-// void exit(int status)
-// {
-// 	/* 현재 프로세스를 종료시키는 시스템 콜 */
-// 	/* status: 프로그램이 정상적으로 종료됐는지 확인 */
+/* 확인 요망 */
+void exit(int status)
+{
+	/* 현재 프로세스를 종료시키는 시스템 콜 */
+	/* status: 프로그램이 정상적으로 종료됐는지 확인 */
 
-// 	/* 실행중인 스레드 구조체를 가져옴 */
-// 	struct thread *cur = thread_current();
-// 	printf("-------------------status : %d-----------\n", status);
-// 	// printf("cur status : %d\n", cur->exit_status);
-// 	/* 정상적으로 종료 시 status는 0 */
+	/* 실행중인 스레드 구조체를 가져옴 */
+	struct thread *cur = thread_current();
+	cur->exit_status = status;
+	/* 정상적으로 종료 시 status는 0 */
 
-// 	/* 종료 시 "프로세스 이름: exit(status)" 출력(Process Termination Message) */
-// 	/* status 확인 요망 */
-// 	printf("%s: exit(%d)",cur->name, status);
-// 	/* 스레드 종료 */
-// 	thread_exit();
-// }
+	/* 종료 시 "프로세스 이름: exit(status)" 출력(Process Termination Message) */
+	/* status 확인 요망 */
+	/* 스레드 종료 */
+	thread_exit();
+}
 
-// /* 확인 요망 (나중에 구현!!!) */
-// pid_t fork(const char *thread_name)
-// {
-// 	struct thread* cur = thread_current();
-// 	process_fork(thread_name, &cur->tf);
-// 	/* 프로세스 생성 시 부모 thread 구조체 안 list에 자식 thread 추가 */
-// }
+/* 확인 요망 (나중에 구현!!!) */
+pid_t fork(const char *thread_name)
+{
+	struct thread* cur = thread_current();
+	process_fork(thread_name, &cur->tf);
+	/* 프로세스 생성 시 부모 thread 구조체 안 list에 자식 thread 추가 */
+}
 
-// /* 확인 요망 (나중에 구현!!!) */
-// int exec(const char *cmd_line)
-// {
-// 	/* 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜 */
+/* 확인 요망 (나중에 구현!!!) */
+int exec(const char *cmd_line)
+{
+	/* 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜 */
 
-// }
+}
 
-// int wait(pid_t pid)
-// {
+int wait(pid_t pid)
+{
 	
-// 	/* 자식 프로세스의 pid를 기다리고 종료 상태를 확인. */
-// 	/* pid가 살아있다면 종료될 때 까지 기다리고 종료 상태를 반환 */
-// 	/* pid가 exit()을 호출하지 않았지만 커널에 의해 종료된 경우 wait함수는 -1을 반환 */
+	/* 자식 프로세스의 pid를 기다리고 종료 상태를 확인. */
+	/* pid가 살아있다면 종료될 때 까지 기다리고 종료 상태를 반환 */
+	/* pid가 exit()을 호출하지 않았지만 커널에 의해 종료된 경우 wait함수는 -1을 반환 */
 	
-// 	/* 다음 조건 중 하나라도 참이면 -1 반환
-// 		1. pid는 fork()에서 성공적으로 수신됐을 경우에만 호출 프로세스의 자식임.
-// 		2. 프로세스는 주어진 자식에 대해 wait을 한 번만 수행 가능 */
+	/* 다음 조건 중 하나라도 참이면 -1 반환
+		1. pid는 fork()에서 성공적으로 수신됐을 경우에만 호출 프로세스의 자식임.
+		2. 프로세스는 주어진 자식에 대해 wait을 한 번만 수행 가능 */
 
-// 	/* 프로세스는 임의의 수의 자식을 만들고 일부 또는 모든 자식을 기다리지 않고 종료 가능 */
-// 	/* 초기 프로세스가 종료될 때 까지 PintOS가 종료되지 않도록 해야함.
-// 		제공된 PintOS 코드는 main()에서 process_wait()을 호출하여 이를 수행
-// 		process_wait()을 사용해 wait 시스템 호출을 구현하는 것이 좋음 */
-// 	return process_wait(pid);
-// }
+	/* 프로세스는 임의의 수의 자식을 만들고 일부 또는 모든 자식을 기다리지 않고 종료 가능 */
+	/* 초기 프로세스가 종료될 때 까지 PintOS가 종료되지 않도록 해야함.
+		제공된 PintOS 코드는 main()에서 process_wait()을 호출하여 이를 수행
+		process_wait()을 사용해 wait 시스템 호출을 구현하는 것이 좋음 */
+	return process_wait(pid);
+}
 
-// bool create(const char* file, unsigned initial_size)
-// {
-// 	check_address(&file);
-// 	/* 파일 이름과 크기에 해당하는 파일 생성 */
-// 	/* 파일 생성 성공 시 true 반환, 실패 시 flase 반환 */
-// 	return (filesys_create(file, initial_size)) ? true : false;
-// }
+bool create(const char* file, unsigned initial_size)
+{
 
-// bool remove(const char *file)
-// {
-// 	check_address(&file);
-// 	/* 파일 이름에 해당하는 파일을 제거 */
-// 	/* 파일 제거 성공 시 true 반환, 실패 시 false 반환 */
-// 	return (filesys_remove(file)) ? true : false;
-// }
+	check_address(file);
+	/* 파일 이름과 크기에 해당하는 파일 생성 */
+	/* 파일 생성 성공 시 true 반환, 실패 시 flase 반환 */
+	if (file == NULL || initial_size <= 0)
+	{
+		exit(-1);
+	}
+	
+	return (filesys_create(file, initial_size)) ? true : false;
+}
 
-// /* 먼저 구현해!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-// int write(int fd, const void *buffer, unsigned size)
-// {
-// 	/* 열린 파일의 데이터를 기록하는 시스템 콜 */
-// 	/* 성공 시 기록한 데이터의 바이트 수를 반환, 실패 시 -1 반환 */
-// 	/* buffer : 기록 할 데이터를 저장한 버퍼의 주소 값 */
-// 	/* size : 기록 할 데이터 크기 */
-// 	/* fd 값이 1일 때 버퍼에 저장된 데이터를 화면에 출력(putbuf() 이용) */
-// 	/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
-// 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
-// 	/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후
-// 		버퍼의 크기 리턴 (putbuf() 이용) */
-// 	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기 만큼
-// 		파일에 기록 후 기록한 바이트 수를 리턴 */
-// 	file_write(fd, buffer, size);
-// }
+bool remove(const char *file)
+{
+	check_address(file);
+	/* 파일 이름에 해당하는 파일을 제거 */
+	/* 파일 제거 성공 시 true 반환, 실패 시 false 반환 */
+	return (filesys_remove(file)) ? true : false;
+}
+
+int open(const char *file)
+{
+
+}
+
+int write(int fd, const void *buffer, unsigned size)
+{
+	/* 열린 파일의 데이터를 기록하는 시스템 콜 */
+	/* 성공 시 기록한 데이터의 바이트 수를 반환, 실패 시 -1 반환 */
+	/* buffer : 기록 할 데이터를 저장한 버퍼의 주소 값 */
+	/* size : 기록 할 데이터 크기 */
+	/* fd 값이 1일 때 버퍼에 저장된 데이터를 화면에 출력(putbuf() 이용) */
+	/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후
+		버퍼의 크기 리턴 (putbuf() 이용) */
+	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기 만큼
+		파일에 기록 후 기록한 바이트 수를 리턴 */
+	if (fd == 1) {
+		putbuf(buffer, size);
+		return size;
+	}
+}
