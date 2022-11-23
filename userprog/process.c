@@ -74,10 +74,11 @@ parsing_str(char *file_name, char* argv[]){
 		token != NULL;
 		token = strtok_r (NULL, " ", &save_ptr))
 		{
-			argv[count] = token;
-			count++;
+			argv[count] = token; // grep foo bar
+			count++; // 1 2 3 
 		}
 	//argv[count] = "\0";
+	// printf("Count: %d\n", count);
 	return count; // \0을 포함한 개수를 셈
 }
 
@@ -216,7 +217,10 @@ process_exec (void *f_name) {
 	// 디버깅
 	void** rsapp = &_if.rsp;
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
+	// printf("RSP: %s\n", _if.rsp);
+	// printf("RDI: %s\n", _if.R.rdi);
+	// printf("RSI: %s\n", _if.R.rsi);
+	// printf("RDX: %s\n", _if.R.rdx);
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -231,7 +235,7 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	/* fake address(0) 저장 */
 	char* rsp_adr[128];
 	int i, j;
-
+	printf("Count: %d\n",count);
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
@@ -241,6 +245,8 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 		// *(char *)if_->rsp = parse[i][j];
 		memcpy(if_->rsp, argv[i], strlen(argv[i]) + 1);
 	}
+
+
 	// rsp(16진수)를 8의 배수로 체크하고 맞춤
 	while (if_->rsp % 8 != 0)
 	{
@@ -248,17 +254,18 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 		// *(uint8_t*) if_->rsp = 0; // 이거 써도 됨
 		memset(if_->rsp, 0, sizeof(char)); //char*가 아니라 char로 해줘야 함
 	}
-	
+	// 0 추가
+	if_->rsp = if_->rsp - 8;
+	memset(if_->rsp, 0, sizeof(char*));
+
 	/* 프로그램 이름 및 인자 주소들 push */
-	for (i = 0; i < count; i++)
+	for (i = count-1; i >= 0; i--)
 	{
 		if_->rsp = if_->rsp - 8;
-		if(i == 0){
-			memset(if_->rsp, 0, sizeof(char*));
-		} else {
-			memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
-		}
+		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
+		
 		// *(char *)if_->rsp = rsp_adr[i];
+		printf("Address: %x\n",rsp_adr[i]);
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
