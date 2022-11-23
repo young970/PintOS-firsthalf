@@ -122,7 +122,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 void check_address(void *addr)
 {
 	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인 */
-	if (!is_user_vaddr(addr) || addr == NULL)
+	if (!is_user_vaddr(addr))
 	{
 		/* 잘못된 접근일 경우 프로세스 종료 */
 		/* 확인 요망 */
@@ -200,16 +200,17 @@ int wait(pid_t pid)
 bool create(const char* file, unsigned initial_size)
 {
 	check_address(file);
-	/* 파일 이름과 크기에 해당하는 파일 생성 */
-	/* 파일 생성 성공 시 true 반환, 실패 시 flase 반환 */
+	
+	if(file == NULL || initial_size <= 0)
+		exit(-1);
+
 	return (filesys_create(file, initial_size)) ? true : false;
 }
 
 bool remove(const char *file)
 {
 	check_address(file);
-	/* 파일 이름에 해당하는 파일을 제거 */
-	/* 파일 제거 성공 시 true 반환, 실패 시 false 반환 */
+	
 	return (filesys_remove(file)) ? true : false;
 }
 
