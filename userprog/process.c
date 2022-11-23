@@ -217,6 +217,7 @@ process_exec (void *f_name) {
 	// 디버깅
 	void** rsapp = &_if.rsp;
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+
 	// printf("RSP: %s\n", _if.rsp);
 	// printf("RDI: %s\n", _if.R.rdi);
 	// printf("RSI: %s\n", _if.R.rsi);
@@ -235,6 +236,7 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	/* fake address(0) 저장 */
 	char* rsp_adr[128];
 	int i, j;
+
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
@@ -264,6 +266,7 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
 		
 		// *(char *)if_->rsp = rsp_adr[i];
+		printf("Address: %x\n",rsp_adr[i]);
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
