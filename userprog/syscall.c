@@ -77,11 +77,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// 	break;
 
 	case SYS_CREATE:
-		create(f->R.rdi, f->R.rsi);
+		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
 	
 	case SYS_REMOVE:
-		remove(f->R.rdi);
+		f->R.rax = remove(f->R.rdi);
 		break;
 
 	// case SYS_OPEN:
