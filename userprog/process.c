@@ -266,7 +266,6 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
 		
 		// *(char *)if_->rsp = rsp_adr[i];
-		printf("Address: %x\n",rsp_adr[i]);
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
