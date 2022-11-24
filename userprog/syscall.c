@@ -13,6 +13,8 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/synch.h"
+#include "devices/input.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -41,6 +43,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -88,13 +91,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = open(f->R.rdi);
 		break;
 
-	// case SYS_FILESIZE:
-	// 	filesize();
-	// 	break;
+	case SYS_FILESIZE:
+		f->R.rax = filesize(f->R.rdi);
+		break;
 
-	// case SYS_READ:
-	// 	read();
-	// 	break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
 		
 	case SYS_WRITE:
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
@@ -247,6 +250,60 @@ int open(const char *file)
 	}
 	/* 파일 디스크립터 리턴 */
 	return fd;
+}
+
+/* 확인 요망 (테스트 불가) */
+int filesize(int fd)
+{
+	struct file* get_file = process_get_file(fd);
+	if(get_file == NULL)
+	{
+		/* 해당 파일이 존재하지 않으면 -1 리턴 */
+		return -1;
+	}
+	return file_length(get_file);
+}
+
+int read(int fd, void *buffer, unsigned size)
+{
+	check_address(buffer);
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *get_file = process_get_file(fd);
+	int count = 0;
+	char input;
+
+	if(get_file == NULL)
+	{
+		return -1;
+	}
+	if (fd == 0)
+	{
+		/* 파일 디스크립터가 0일 경우 키보드 입력을 버퍼에 저장 후
+		버퍼의 저장한 크기를 리턴(input_getc() 이용) */
+		while(count < size)
+		{
+			input = input_getc();
+			*(char *)buffer = input;
+
+			*buffer++;
+			count++;
+		}
+		
+	}
+	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기 만큼 저장 후
+	읽은 바이트 수를 리턴 */
+	else if (fd <= 1 || fd >= FDT_COUNT_LIMIT)
+	{
+		return -1;
+	}
+	else
+	{
+		/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+		lock_acquire(&filesys_lock);
+		count =	file_read(get_file, buffer, size);
+		lock_release(&filesys_lock);
+	}
+	return count;
 }
 
 int write(int fd, const void *buffer, unsigned size)
