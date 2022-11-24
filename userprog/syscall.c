@@ -56,9 +56,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	/* 확인 요망 (rax 값) */
 	switch (f->R.rax)
 	{
-	// case SYS_HALT:
-	// 	halt();
-	// 	break;
+	case SYS_HALT:
+		halt();
+		break;
 	
 	case SYS_EXIT:
 		exit(f->R.rdi);
@@ -77,16 +77,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// 	break;
 
 	case SYS_CREATE:
-		create(f->R.rdi, f->R.rsi);
+		f->R.rax = create(f->R.rdi, f->R.rsi);
 		break;
 	
 	case SYS_REMOVE:
-		remove(f->R.rdi);
+		f->R.rax = remove(f->R.rdi);
 		break;
 
-	// case SYS_OPEN:
-	// 	open();
-	// 	break;
+	case SYS_OPEN:
+		f->R.rax = open(f->R.rdi);
+		break;
 
 	// case SYS_FILESIZE:
 	// 	filesize();
@@ -115,14 +115,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	default:
 		break;
 	}
+	/* 0 : halt */
+	/* 1 : exit */
+	/* . . . */
+
 	// printf ("system call!\n");
 	// thread_exit ();
 }
 
 void check_address(void *addr)
 {
+	struct thread* curr = thread_current();
+	
 	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인 */
-	if (!is_user_vaddr(addr))
+	if (!is_user_vaddr(addr) || addr == NULL || pml4_get_page(curr->pml4, addr) == NULL)
 	{
 		/* 잘못된 접근일 경우 프로세스 종료 */
 		/* 확인 요망 */
@@ -130,20 +136,20 @@ void check_address(void *addr)
 	}
 }
 
-void get_argument(uintptr_t rsp, int *arg, int count)
-{
-	int i;
-	/* 인자가 저장된 위치가 유저영역인지 확인 */
-	check_address(rsp);
+// void get_argument(uintptr_t rsp, int *arg, int count)
+// {
+// 	int i;
+// 	/* 인자가 저장된 위치가 유저영역인지 확인 */
+// 	check_address(rsp);
 
-	/* 유저 스택에 저장된 인자값들을 커널로 저장 */
-	/* 확인 요망 */
-	for(i = 0; i >count; i++)
-	{
-		arg[i] = *(char *) rsp;
-		rsp++;
-	}
-}
+// 	/* 유저 스택에 저장된 인자값들을 커널로 저장 */
+// 	/* 확인 요망 */
+// 	for(i = 0; i >count; i++)
+// 	{
+// 		arg[i] = *(char *) rsp;
+// 		rsp++;
+// 	}
+// }
 
 /* 확인 요망 */
 void halt(void)
@@ -155,13 +161,19 @@ void halt(void)
 /* 확인 요망 */
 void exit(int status)
 {
+	/* 현재 프로세스를 종료시키는 시스템 콜 */
+	/* status: 프로그램이 정상적으로 종료됐는지 확인 */
+
+	/* 실행중인 스레드 구조체를 가져옴 */
 	struct thread *cur = thread_current();
 	cur->exit_status = status;
+	/* 정상적으로 종료 시 status는 0 */
+	printf("%s: exit(%d)\n", cur->name, cur->exit_status);
 
+	/* 종료 시 "프로세스 이름: exit(status)" 출력(Process Termination Message) */
+	/* status 확인 요망 */
+	/* 스레드 종료 */
 	thread_exit();
-	
-	// /* 스레드 종료 */
-	// thread_exit();
 }
 
 /* 확인 요망 (나중에 구현!!!) */
@@ -199,24 +211,59 @@ int wait(pid_t pid)
 
 bool create(const char* file, unsigned initial_size)
 {
-	check_address(file);
-	
-	if(file == NULL || initial_size <= 0)
-		exit(-1);
 
+	check_address(file);
+	/* 파일 이름과 크기에 해당하는 파일 생성 */
+	/* 파일 생성 성공 시 true 반환, 실패 시 flase 반환 */
+	
 	return (filesys_create(file, initial_size)) ? true : false;
 }
 
 bool remove(const char *file)
 {
 	check_address(file);
-	
+	/* 파일 이름에 해당하는 파일을 제거 */
+	/* 파일 제거 성공 시 true 반환, 실패 시 false 반환 */
 	return (filesys_remove(file)) ? true : false;
 }
 
-int write (int fd, const void *buffer, unsigned size) {
+int open(const char *file)
+{
+	check_address(file);
+	/* 파일을 open */
+	struct file* open_file = filesys_open(file);
+
+	if(open_file == NULL)
+	{
+		/* 해당 파일이 존재하지 않으면 -1 리턴 */
+		return -1;
+	}
+	
+	/* 해당 파일 객체에 파일 디스크립터 부여 */
+	int fd = process_add_file(open_file);
+	if(fd == -1)
+	{
+		file_close(open_file);
+	}
+	/* 파일 디스크립터 리턴 */
+	return fd;
+}
+
+int write(int fd, const void *buffer, unsigned size)
+{
+	/* 열린 파일의 데이터를 기록하는 시스템 콜 */
+	/* 성공 시 기록한 데이터의 바이트 수를 반환, 실패 시 -1 반환 */
+	/* buffer : 기록 할 데이터를 저장한 버퍼의 주소 값 */
+	/* size : 기록 할 데이터 크기 */
+	/* fd 값이 1일 때 버퍼에 저장된 데이터를 화면에 출력(putbuf() 이용) */
+	/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후
+		버퍼의 크기 리턴 (putbuf() 이용) */
+	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기 만큼
+		파일에 기록 후 기록한 바이트 수를 리턴 */
 	if (fd == 1) {
 		putbuf(buffer, size);
-		return size;
 	}
+	return size;
 }

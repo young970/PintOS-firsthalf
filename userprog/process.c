@@ -18,9 +18,6 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
-
-#include "threads/synch.h"
-
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -215,9 +212,7 @@ process_exec (void *f_name) {
 		return -1;
 
 	// 디버깅
-	void** rsapp = &_if.rsp;
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	// printf("RSP: %s\n", _if.rsp);
 	// printf("RDI: %s\n", _if.R.rdi);
 	// printf("RSI: %s\n", _if.R.rsi);
@@ -236,7 +231,6 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	/* fake address(0) 저장 */
 	char* rsp_adr[128];
 	int i, j;
-
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
@@ -260,7 +254,7 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	memset(if_->rsp, 0, sizeof(char*));
 
 	/* 프로그램 이름 및 인자 주소들 push */
-	for (i = count-1; i >= 0; i--)
+	for (i = count - 1; i >= 0; i--)
 	{
 		if_->rsp = if_->rsp - 8;
 		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
@@ -303,27 +297,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-
-	/* 자식 프로세스의 프로세스 디스크립터 검색 */
-	/* 예외 처리 발생시 -1 리턴 */
-	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
-	/* 자식 프로세스 디스크립터 삭제 */
-	/* 자식 프로세스의 exit status 리턴 */
-	// struct thread* curr = thread_current();
-	// struct semaphore_elem* curr_sema_elem = list_entry(&curr->elem, struct semaphore_elem, elem);
-
-	// struct thread* child_thread = list_entry(list_begin(&curr->childs), struct thread, elem);
-
-	// if(!list_empty(&curr->childs) && 
-	// 	(child_thread->tid == child_tid || 
-	// 	curr_sema_elem->semaphore.value != 0))
-	// {
-	// 	sema_init(&curr_sema_elem->semaphore, 0);
-	// 	sema_down(&curr_sema_elem->semaphore);
-	// 	list_pop_front(&curr->childs);
-	// 	return child_thread->exit_status;
-	// }
-	thread_set_priority(thread_get_priority() - 1);
+	thread_set_priority(thread_get_priority()-1);
 	return -1;
 }
 
@@ -331,8 +305,12 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
-	printf("%s: exit(%d)\n",curr->name, curr->exit_status);
-	process_cleanup();
+	/* TODO: Your code goes here.
+	 * TODO: Implement process termination message (see
+	 * TODO: project2/process_termination.html).
+	 * TODO: We recommend you to implement process resource cleanup here. */
+
+	process_cleanup ();
 }
 
 /* Free the current process's resources. */
@@ -762,9 +740,34 @@ setup_stack (struct intr_frame *if_) {
 }
 #endif /* VM */
 
-struct thread *get_child_process(int pid)
+int process_add_file(struct file *f)
 {
-	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
-	/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
-	/* 리스트에 존재하지 않으면 NULL 리턴 */
+	struct thread* curr = thread_current();
+	while(curr->fdt[curr->fd] != NULL && curr->fd < FDT_COUNT_LIMIT)
+	{
+		/* 파일 디스크립터의 최대값 1 증가 */
+		curr->fd++;
+	}
+	if(curr->fd >= FDT_COUNT_LIMIT)
+	{
+		return -1;
+	}
+	/* 파일 객체를 파일 디스크립터 테이블에 추가 */
+	curr->fdt[curr->fd] = f;
+
+	/* 파일 디스크립터 리턴 */
+	return curr->fd;
+}
+
+struct file *process_get_file(int fd)
+{
+	struct thread* curr = thread_current();
+
+	if (fd < 0)
+	{
+		/* 없을 시 NULL을 리턴 */
+		return NULL;
+	}
+	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
+	return curr->fdt[fd];
 }
