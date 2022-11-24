@@ -309,7 +309,18 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	
+	/* 프로세스에 열린 모든 파일을 닫음 */
+	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의
+		최소값인 2가 될 때 까지 파일을 닫음 */
+	while (curr->fd > 2)
+	{
+		process_close_file(curr->fd);
+		curr->fd -= 1;
+	}
+	palloc_free_multiple(curr->fdt, 3);
+	
+	/* 파일 디스크립터 테이블 메모리 해제 */
 	process_cleanup ();
 }
 
@@ -743,12 +754,12 @@ setup_stack (struct intr_frame *if_) {
 int process_add_file(struct file *f)
 {
 	struct thread* curr = thread_current();
-	while(curr->fdt[curr->fd] != NULL && curr->fd < 3 * (1<<9))
+	while(curr->fdt[curr->fd] != NULL && curr->fd < FDT_COUNT_LIMIT)
 	{
 		/* 파일 디스크립터의 최대값 1 증가 */
 		curr->fd++;
 	}
-	if(curr->fd >= 3 * (1<<9))
+	if(curr->fd >= FDT_COUNT_LIMIT)
 	{
 		return -1;
 	}
@@ -763,11 +774,20 @@ struct file *process_get_file(int fd)
 {
 	struct thread* curr = thread_current();
 
-	if (fd < 0)
+	if (curr->fdt[fd] == NULL)
 	{
 		/* 없을 시 NULL을 리턴 */
 		return NULL;
 	}
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
 	return curr->fdt[fd];
+}
+
+void process_close_file(int fd)
+{
+	struct thread* curr = thread_current();
+	/* 파일 디스크립터에 해당하는 파일을 닫음 */
+	file_close(curr->fdt[fd]);
+	/* 파일 디스크립터 테이블 해당 엔트리 초기화 */
+	curr->fdt[fd] = NULL;
 }

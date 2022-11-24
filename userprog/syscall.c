@@ -13,6 +13,8 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/synch.h"
+#include "devices/input.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -41,6 +43,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -88,13 +91,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = open(f->R.rdi);
 		break;
 
-	// case SYS_FILESIZE:
-	// 	filesize();
-	// 	break;
+	case SYS_FILESIZE:
+		f->R.rax = filesize(f->R.rdi);
+		break;
 
-	// case SYS_READ:
-	// 	read();
-	// 	break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+		break;
 		
 	case SYS_WRITE:
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
@@ -247,6 +250,18 @@ int open(const char *file)
 	}
 	/* 파일 디스크립터 리턴 */
 	return fd;
+}
+
+/* 확인 요망 (테스트 불가) */
+int filesize(int fd)
+{
+	struct file* get_file = process_get_file(fd);
+	if(get_file == NULL)
+	{
+		/* 해당 파일이 존재하지 않으면 -1 리턴 */
+		return -1;
+	}
+	return file_length(get_file);
 }
 
 int read(int fd, void *buffer, unsigned size)
