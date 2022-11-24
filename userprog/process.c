@@ -743,12 +743,12 @@ setup_stack (struct intr_frame *if_) {
 int process_add_file(struct file *f)
 {
 	struct thread* curr = thread_current();
-	while(curr->fdt[curr->fd] != NULL && curr->fd < 3 * (1<<9))
+	while(curr->fdt[curr->fd] != NULL && curr->fd < FDT_COUNT_LIMIT)
 	{
 		/* 파일 디스크립터의 최대값 1 증가 */
 		curr->fd++;
 	}
-	if(curr->fd >= 3 * (1<<9))
+	if(curr->fd >= FDT_COUNT_LIMIT)
 	{
 		return -1;
 	}
