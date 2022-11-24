@@ -249,6 +249,48 @@ int open(const char *file)
 	return fd;
 }
 
+int read(int fd, void *buffer, unsigned size)
+{
+	check_address(buffer);
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *get_file = process_get_file(fd);
+	int count = 0;
+	char input;
+
+	if(get_file == NULL)
+	{
+		return -1;
+	}
+	if (fd == 0)
+	{
+		/* 파일 디스크립터가 0일 경우 키보드 입력을 버퍼에 저장 후
+		버퍼의 저장한 크기를 리턴(input_getc() 이용) */
+		while(count < size)
+		{
+			input = input_getc();
+			*(char *)buffer = input;
+
+			*buffer++;
+			count++;
+		}
+		
+	}
+	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기 만큼 저장 후
+	읽은 바이트 수를 리턴 */
+	else if (fd <= 1 || fd >= FDT_COUNT_LIMIT)
+	{
+		return -1;
+	}
+	else
+	{
+		/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+		lock_acquire(&filesys_lock);
+		count =	file_read(get_file, buffer, size);
+		lock_release(&filesys_lock);
+	}
+	return count;
+}
+
 int write(int fd, const void *buffer, unsigned size)
 {
 	/* 열린 파일의 데이터를 기록하는 시스템 콜 */
