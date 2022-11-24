@@ -212,8 +212,7 @@ process_exec (void *f_name) {
 		return -1;
 
 	// 디버깅
-	void** rsapp = &_if.rsp;
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	// printf("RSP: %s\n", _if.rsp);
 	// printf("RDI: %s\n", _if.R.rdi);
 	// printf("RSI: %s\n", _if.R.rsi);
@@ -232,7 +231,6 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	/* fake address(0) 저장 */
 	char* rsp_adr[128];
 	int i, j;
-	printf("Count: %d\n",count);
 	/* 프로그램 이름 및 인자(문자열) push */
 	for(i = count - 1; i > -1; i--) 
 	{
@@ -262,7 +260,6 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 		memcpy(if_->rsp, &rsp_adr[i], sizeof(char*));
 		
 		// *(char *)if_->rsp = rsp_adr[i];
-		printf("Address: %x\n",rsp_adr[i]);
 	}
 
 	// /* argv (문자열을 가리키는 주소들의 배열을 가리킴) push*/ 
@@ -742,3 +739,35 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
+
+int process_add_file(struct file *f)
+{
+	struct thread* curr = thread_current();
+	while(curr->fdt[curr->fd] != NULL && curr->fd < 3 * (1<<9))
+	{
+		/* 파일 디스크립터의 최대값 1 증가 */
+		curr->fd++;
+	}
+	if(curr->fd >= 3 * (1<<9))
+	{
+		return -1;
+	}
+	/* 파일 객체를 파일 디스크립터 테이블에 추가 */
+	curr->fdt[curr->fd] = f;
+
+	/* 파일 디스크립터 리턴 */
+	return curr->fd;
+}
+
+struct file *process_get_file(int fd)
+{
+	struct thread* curr = thread_current();
+
+	if (fd < 0)
+	{
+		/* 없을 시 NULL을 리턴 */
+		return NULL;
+	}
+	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
+	return curr->fdt[fd];
+}

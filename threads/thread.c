@@ -14,6 +14,8 @@
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+#include "filesys/filesys.h"
+
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -216,6 +218,12 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	/* fdt 메모리 할당 */
+	t->fd = 2;
+	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
+	t->fdt[0] = 1;
+	t->fdt[1] = 2;
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -227,6 +235,9 @@ thread_create (const char *name, int priority,
 	/* 성심당 가자 */
 	if (cmp_priority(&t->elem, &curr->elem, NULL))
 		thread_yield();
+
+
+
 
 	return tid;
 }
@@ -595,6 +606,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->init_priority = priority;
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
+	t->exit_status = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
