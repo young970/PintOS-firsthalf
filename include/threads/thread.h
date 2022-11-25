@@ -117,11 +117,20 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
-	// int exit_status;
+	int exit_status;
 	
-	// struct file** fdt;
-	// int fd;
+	struct file** fdt;
+	int fd;
 
+	struct list child_list;			// 자식 프로세스를 담을 리스트
+	struct list_elem child_elem;
+	struct intr_frame parent_if;	// 유저 스택의 정보를 저장
+
+	struct semaphore sema_fork;		// create 될 때 까지 기다림
+	struct semaphore sema_wait;		// 자식 프로세스가 종료 될 때 까지 기다림
+	struct semaphore sema_free;		// 자식 프로세스가 free될 때 까지 기다림
+	
+v
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -136,6 +145,12 @@ struct thread {
 	
 	struct file** fdt;
 	int fd;
+
+	struct list child_list;			// 자식 프로세스를 담을 리스트
+	struct list_elem child_elem;
+	struct intr_frame parent_if;
+	struct semaphore sema_fork;
+
 
 #endif
 #ifdef VM
