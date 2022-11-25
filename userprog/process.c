@@ -309,7 +309,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	
+
 	/* 프로세스에 열린 모든 파일을 닫음 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의
 		최소값인 2가 될 때 까지 파일을 닫음 */
@@ -774,7 +774,8 @@ struct file *process_get_file(int fd)
 {
 	struct thread* curr = thread_current();
 
-	if (curr->fdt[fd] == NULL)
+	// if (curr->fdt[fd] == NULL)
+	if(fd < 0 || fd >= FDT_COUNT_LIMIT)
 	{
 		/* 없을 시 NULL을 리턴 */
 		return NULL;
