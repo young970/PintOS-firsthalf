@@ -267,6 +267,7 @@ int filesize(int fd)
 int read(int fd, void *buffer, unsigned size)
 {
 	check_address(buffer);
+	check_address(buffer + size - 1);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
 	struct file *get_file = process_get_file(fd);
 	int count = 0;
@@ -286,16 +287,19 @@ int read(int fd, void *buffer, unsigned size)
 			*(char *)buffer = input;
 
 			*buffer++;
+			if(input == '\0'){
+				break;
+			}
 			count++;
 		}
 		
 	}
-	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기 만큼 저장 후
-	읽은 바이트 수를 리턴 */
-	else if (fd <= 1 || fd >= FDT_COUNT_LIMIT)
+	else if (fd == 1)
 	{
 		return -1;
 	}
+	/* 파일 디스크립터가 0이 아닐 경우 파일의 데이터를 크기 만큼 저장 후
+	읽은 바이트 수를 리턴 */
 	else
 	{
 		/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
@@ -306,21 +310,38 @@ int read(int fd, void *buffer, unsigned size)
 	return count;
 }
 
+
+/* 열린 파일의 데이터를 기록하는 시스템 콜 */
+/* 성공 시 기록한 데이터의 바이트 수를 반환, 실패 시 -1 반환 */
+/* buffer : 기록 할 데이터를 저장한 버퍼의 주소 값 */
+/* size : 기록 할 데이터 크기 */
+/* fd 값이 1일 때 버퍼에 저장된 데이터를 화면에 출력(putbuf() 이용) */
 int write(int fd, const void *buffer, unsigned size)
 {
-	/* 열린 파일의 데이터를 기록하는 시스템 콜 */
-	/* 성공 시 기록한 데이터의 바이트 수를 반환, 실패 시 -1 반환 */
-	/* buffer : 기록 할 데이터를 저장한 버퍼의 주소 값 */
-	/* size : 기록 할 데이터 크기 */
-	/* fd 값이 1일 때 버퍼에 저장된 데이터를 화면에 출력(putbuf() 이용) */
-	/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+	check_address(buffer);
+	check_address(buffer + size - 1);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
-	/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후
-		버퍼의 크기 리턴 (putbuf() 이용) */
-	/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기 만큼
-		파일에 기록 후 기록한 바이트 수를 리턴 */
+	struct file *get_file = process_get_file(fd);
+
+	if(get_file == NULL)
+	{
+		return -1;
+	}
 	if (fd == 1) {
+		/* 파일 디스크립터가 1일 경우 버퍼에 저장된 값을 화면에 출력 후
+		버퍼의 크기 리턴 (putbuf() 이용) */
 		putbuf(buffer, size);
+	}
+	else if(fd == 0) {
+		return -1;
+	}
+	else {
+		/* 파일 디스크립터가 1이 아닐 경우 버퍼에 저장된 데이터를 크기 만큼
+		파일에 기록 후 기록한 바이트 수를 리턴 */
+		/* 파일에 동시 접근이 일어날 수 있으므로 lock 사용 */
+		lock_acquire(&filesys_lock);
+		file_write(get_file, buffer, size);
+		lock_release(&filesys_lock);
 	}
 	return size;
 }
