@@ -103,17 +103,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
-	// case SYS_SEEK:
-	// 	seek();
-	// 	break;
+	case SYS_SEEK:
+		seek(f->R.rdi, f->R.rsi);
+		break;
 
-	// case SYS_TELL:
-	// 	tell();
-	// 	break;
+	case SYS_TELL:
+		f->R.rax = tell(f->R.rdi);
+		break;
 
-	// case SYS_CLOSE:
-	// 	close();
-	// 	break;
+	case SYS_CLOSE:
+		close(f->R.rdi);
+		break;
 		
 	default:
 		break;
@@ -344,4 +344,47 @@ int write(int fd, const void *buffer, unsigned size)
 		lock_release(&filesys_lock);
 	}
 	return size;
+}
+
+void seek(int fd, unsigned position)
+{
+	/* 열린 파일의 위치(offset)를 이동하는 시스템 콜 */
+	/* position : 현재 위치(offset)를 기준으로 이동 할 거리 */
+
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *get_file = process_get_file(fd);
+
+	if(get_file == NULL)
+	{
+		return;
+	}
+	/* 해당 열린 파일의 위치(offset)를 position만큼 이동 */
+	file_seek(get_file, position);
+}
+
+unsigned tell(int fd)
+{
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *get_file = process_get_file(fd);
+
+	if(get_file == NULL)
+	{
+		return;
+	}
+	/*해당 열린 파일의 위치를 반환*/
+	return file_tell(get_file);
+}
+
+void close(int fd)
+{
+	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *get_file = process_get_file(fd);
+
+	if(get_file == NULL)
+	{
+		return;
+	}
+	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
+	/* 파일 디스크립터 엔트리 초기화 */
+	process_close_file(fd);
 }
