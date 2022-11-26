@@ -99,17 +99,16 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	struct thread *curr = thread_current();
-	struct tid_t *tid;
-	memcpy(&curr->parent_if, if_, sizeof(if_));
+	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
 
-	tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
-	struct thread *child_thread = get_child(tid);
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
 	if(tid == TID_ERROR)
 	{
 		return TID_ERROR;
 	}
-
+	struct thread *child_thread = get_child_process(tid);
 	sema_down(&child_thread->sema_fork);
+
 	return tid;
 }
 
@@ -150,12 +149,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
 	
-	memcpy(newpage, parent_page, sizeof(parent_page));
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
-	if(writable == 0)
-	{
-		return false;
-	}
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
@@ -842,19 +837,36 @@ void process_close_file(int fd)
 	curr->fdt[fd] = NULL;
 }
 
-struct thread* get_child(int pid)
+struct thread* get_child_process(int pid)
 {
 	struct thread *curr = thread_current();
 	struct list_elem *child_elem = list_begin(&curr->child_list);
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
 	for(child_elem; list_end(&curr->child_list); 
 		child_elem = list_next(child_elem))
 	{
 		struct thread *child_thread = list_entry(child_elem, struct thread, elem);
 		if(child_thread->tid == pid)
 		{
+			/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
 			return child_thread;
 		}
 	}
+	/* 리스트에 존재하지 않으면 NULL 리턴 */
 	return NULL;
 }
 
+void remove_child_process(struct thread *cp)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *child_elem = &cp->child_elem;
+	/* 자식 리스트에서 제거 */
+	for(struct list_elem *current_child_elem = list_begin(&curr->child_list);
+		current_child_elem != list_end(&curr->child_list); list_next(current_child_elem))
+		{
+			/* 확인 요망 */
+			if(current_child_elem == child_elem) list_remove(current_child_elem);
+		}
+	/* 프로세스 디스크립터 메모리 해제 */
+	palloc_free_page(cp);
+}
