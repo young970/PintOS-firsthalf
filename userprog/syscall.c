@@ -67,13 +67,16 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		exit(f->R.rdi);
 		break;
 
-	// case SYS_FORK:
-	// 	fork();
-	// 	break;
+	case SYS_FORK:
+		f->R.rax = fork(f->R.rdi);
+		break;
 
-	// case SYS_EXEC:
-	// 	exec();
-	// 	break;
+	case SYS_EXEC: ;
+		char *argv[128];
+		parsing_str(f->R.rdi, argv);
+		check_address((void *)argv[0]);
+		f->R.rax = exec(argv[0]);
+		break;
 
 	// case SYS_WAIT:
 	// 	wait();
@@ -190,7 +193,22 @@ pid_t fork(const char *thread_name)
 /* 확인 요망 (나중에 구현!!!) */
 int exec(const char *cmd_line)
 {
+	struct thread *curr = thread_current();
 	/* 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜 */
+	/* 프로세스 생성에 성공 시 생성된 프로세스에 pid 값을 반환, 실패 시 -1 반환 */
+	/* 부모 프로세스는 생성된 자식 프로세스의 프로그램이 메모리에 적재 될 때 까지 대기
+		- 세마포어를 사용하여 대기 */
+	/* cmd_line : 새로운 프로세스에 실행할 프로그램 명령어 */
+	/* pid_t : int 자료형 */
+
+	/* process_exec() 함수를 호출하여 자식 프로세스 생성 */
+	sema_down(&curr->sema_load);
+	process_create_initd(cmd_line);
+	sema_up(&curr->sema_load);
+	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때 까지 대기 */
+	/* 프로그램 적재 실패 시 -1 리턴 */
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
 
 }
 

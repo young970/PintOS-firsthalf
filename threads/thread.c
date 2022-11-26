@@ -224,6 +224,19 @@ thread_create (const char *name, int priority,
 	t->fdt[0] = 1;
 	t->fdt[1] = 2;
 
+	/* 부모 프로세스 저장 */
+	t->parent = curr->tid;
+	/* 프로그램이 로드되지 않음 */
+	t->is_mem = false;
+	/* 프로세스가 종료되지 않음 */
+	t->is_on = false;
+	/* exit 세마포어 0으로 초기화 */
+	sema_init(&t->sema_exit, 0);
+	/* load 세마포어 0으로 초기화 */
+	sema_init(&t->sema_load, 0);
+	/* 자식 리스트에 추가 */
+	list_push_back(&curr->child_list, &t->child_elem);
+
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -235,9 +248,6 @@ thread_create (const char *name, int priority,
 	/* 성심당 가자 */
 	if (cmp_priority(&t->elem, &curr->elem, NULL))
 		thread_yield();
-
-
-
 
 	return tid;
 }
@@ -607,6 +617,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
 	t->exit_status = 0;
+
+	list_init(&t->child_list);
 
 	sema_init(&t->sema_fork, 0);
 	sema_init(&t->sema_wait, 0);
