@@ -99,17 +99,16 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
 	struct thread *curr = thread_current();
-	struct tid_t *tid;
-	memcpy(&curr->parent_if, if_, sizeof(if_));
+	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
 
-	tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
-	struct thread *child_thread = get_child_process(tid);
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
 	if(tid == TID_ERROR)
 	{
 		return TID_ERROR;
 	}
-
+	struct thread *child_thread = get_child_process(tid);
 	sema_down(&child_thread->sema_fork);
+
 	return tid;
 }
 
@@ -150,12 +149,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
 	
-	memcpy(newpage, parent_page, sizeof(parent_page));
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
-	if(writable == 0)
-	{
-		return false;
-	}
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
