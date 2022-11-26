@@ -1,5 +1,5 @@
 #include "userprog/syscall.h"
-#include "lib/user/syscall.h"
+// #include "lib/user/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
@@ -15,6 +15,7 @@
 #include "userprog/process.h"
 #include "threads/synch.h"
 #include "devices/input.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -67,13 +68,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		exit(f->R.rdi);
 		break;
 
-	// case SYS_FORK:
-	// 	fork();
-	// 	break;
+	case SYS_FORK:
+		f->R.rax = fork(f->R.rdi, f);
+		break;
 
-	// case SYS_EXEC:
-	// 	exec();
-	// 	break;
+	case SYS_EXEC:
+		f->R.rax = exec(f->R.rdi);
+		break;
 
 	// case SYS_WAIT:
 	// 	wait();
@@ -180,17 +181,45 @@ void exit(int status)
 }
 
 /* 확인 요망 (나중에 구현!!!) */
-pid_t fork(const char *thread_name)
+tid_t fork(const char *thread_name, struct intr_frame *f)
 {
-	struct thread* cur = thread_current();
-	process_fork(thread_name, &cur->tf);
+
+	// struct thread* cur = thread_current();
+	return process_fork(thread_name, f);
 	/* 프로세스 생성 시 부모 thread 구조체 안 list에 자식 thread 추가 */
 }
 
 /* 확인 요망 (나중에 구현!!!) */
 int exec(const char *cmd_line)
 {
+	check_address(cmd_line);
+
+	int size = strlen(cmd_line) + 1;
+	char *fn_copy = palloc_get_page(PAL_ZERO);
+	if ((fn_copy) == NULL) {
+		exit(-1);
+		return -1;
+	}
+	strlcpy(fn_copy, cmd_line, size);
+
+	if(process_exec(fn_copy) == -1)
+	{
+		exit(-1);
+		return -1;
+	}
+
 	/* 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜 */
+	/* 프로세스 생성에 성공 시 생성된 프로세스에 pid 값을 반환, 실패 시 -1 반환 */
+	/* 부모 프로세스는 생성된 자식 프로세스의 프로그램이 메모리에 적재 될 때 까지 대기
+		- 세마포어를 사용하여 대기 */
+	/* cmd_line : 새로운 프로세스에 실행할 프로그램 명령어 */
+	/* pid_t : int 자료형 */
+
+	/* process_exec() 함수를 호출하여 자식 프로세스 생성 */
+	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때 까지 대기 */
+	/* 프로그램 적재 실패 시 -1 리턴 */
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
 
 }
 

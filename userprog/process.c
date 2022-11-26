@@ -98,8 +98,18 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	struct thread *curr = thread_current();
+	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
+
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
+	if(tid == TID_ERROR)
+	{
+		return TID_ERROR;
+	}
+	struct thread *child_thread = get_child_process(tid);
+	sema_down(&child_thread->sema_fork);
+
+	return tid;
 }
 
 #ifndef VM
@@ -114,21 +124,39 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-
+	if (is_kernel_vaddr(va))
+	{
+		return false;
+	}
+	
 	/* 2. Resolve VA from the parent's page map level 4. */
-	parent_page = pml4_get_page (parent->pml4, va);
+	parent_page = pml4_get_page(parent->pml4, va);
+	if(parent_page == NULL)
+	{
+		return false;
+	}
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 
+	newpage = palloc_get_page(PAL_USER | PAL_ZERO);
+	if(newpage == NULL)
+	{
+		return false;
+	}
+
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
 	return true;
 }
@@ -144,7 +172,7 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
@@ -170,14 +198,32 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	current->fdt[0] = parent->fdt[0];
+	current->fdt[1] = parent->fdt[1];
 
+	for(int i = 2; i < FDT_COUNT_LIMIT; i++)
+	{
+		if(parent->fdt[i] == NULL)
+		{
+			continue;
+		}
+		current->fdt[i] = file_duplicate(parent->fdt[i]);
+	}
+	current->fd = parent->fd;
+
+	sema_up(&current->sema_fork);
+
+	if_.R.rax = 0;
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
-	thread_exit ();
+	current->exit_status = TID_ERROR;
+	sema_up(&current->sema_fork);
+	exit(TID_ERROR);
+	// thread_exit ();
 }exec;
 
 /* Switch the current execution context to the f_name.
@@ -213,10 +259,8 @@ process_exec (void *f_name) {
 
 	// 디버깅
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-	// printf("RSP: %s\n", _if.rsp);
-	// printf("RDI: %s\n", _if.R.rdi);
-	// printf("RSI: %s\n", _if.R.rsi);
-	// printf("RDX: %s\n", _if.R.rdx);
+
+	
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -791,4 +835,38 @@ void process_close_file(int fd)
 	file_close(curr->fdt[fd]);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화 */
 	curr->fdt[fd] = NULL;
+}
+
+struct thread* get_child_process(int pid)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *child_elem = list_begin(&curr->child_list);
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
+	for(child_elem; list_end(&curr->child_list); 
+		child_elem = list_next(child_elem))
+	{
+		struct thread *child_thread = list_entry(child_elem, struct thread, elem);
+		if(child_thread->tid == pid)
+		{
+			/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+			return child_thread;
+		}
+	}
+	/* 리스트에 존재하지 않으면 NULL 리턴 */
+	return NULL;
+}
+
+void remove_child_process(struct thread *cp)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *child_elem = &cp->child_elem;
+	/* 자식 리스트에서 제거 */
+	for(struct list_elem *current_child_elem = list_begin(&curr->child_list);
+		current_child_elem != list_end(&curr->child_list); list_next(current_child_elem))
+		{
+			/* 확인 요망 */
+			if(current_child_elem == child_elem) list_remove(current_child_elem);
+		}
+	/* 프로세스 디스크립터 메모리 해제 */
+	palloc_free_page(cp);
 }
