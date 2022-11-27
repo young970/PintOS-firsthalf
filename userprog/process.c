@@ -51,7 +51,7 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	char *save_ptr;
-	strtok_r(file_name, " ", &save_ptr);
+	strtok_r(file_name, " ", save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);  //배열은 전역변수로 선언 안해도 전역변수로 쓰이는가??
@@ -96,7 +96,7 @@ initd (void *f_name) {
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	struct thread *curr = thread_current();
 	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
@@ -108,7 +108,11 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	}
 	struct thread *child_thread = get_child_process(tid);
 	sema_down(&child_thread->sema_fork);
-
+	// printf("-------------------------child id : %d----child_thread->exit_status : %d\n", tid, child_thread->exit_status);
+	if(child_thread->exit_status == -1)
+	{
+		return TID_ERROR;
+	}
 	return tid;
 }
 
@@ -126,7 +130,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
 	if (is_kernel_vaddr(va))
 	{
-		return false;
+		return true;
 	}
 	
 	/* 2. Resolve VA from the parent's page map level 4. */
@@ -198,23 +202,29 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+
+	if(parent->fd == FDT_COUNT_LIMIT)
+	{
+		goto error;
+	}
+
 	current->fdt[0] = parent->fdt[0];
 	current->fdt[1] = parent->fdt[1];
 
 	for(int i = 2; i < FDT_COUNT_LIMIT; i++)
 	{
-		if(parent->fdt[i] == NULL)
+		struct file *f = parent->fdt[i];
+		if(f == NULL)
 		{
 			continue;
 		}
-		current->fdt[i] = file_duplicate(parent->fdt[i]);
+		current->fdt[i] = file_duplicate(f);
 	}
 	current->fd = parent->fd;
 
 	sema_up(&current->sema_fork);
-
 	if_.R.rax = 0;
-	process_init ();
+	process_init();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
@@ -257,9 +267,9 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+
 	// 디버깅
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	
 	/* Start switched process. */
 	do_iret (&_if);
@@ -341,8 +351,29 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	thread_set_priority(thread_get_priority()-1);
-	return -1;
+	/* 자식 프로세스가 모두 종료될 때 까지 대기(sleep state) */
+	/* 자식 프로세스가 올바르게 종료 됐는지 확인 */
+
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	/* 예외 처리 발생 시 -1 리턴 */
+	/* 자식 프로세스가 종료될 때 까지 부모 프로세스 대기 (세마포어 이용) */
+	/* 자식 프로세스 디스크립터 삭제 */
+	/* 자식 프로세스의 exit status 리턴 */
+
+	struct thread *child = get_child_process(child_tid);
+
+	if(child == NULL)
+	{
+		return -1;
+	}
+
+	sema_down(&child->sema_wait);
+	int exit_status = child->exit_status;
+	list_remove(&child->child_elem);
+	sema_up(&child->sema_free);
+
+	// thread_set_priority(thread_get_priority()-1);
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -357,12 +388,21 @@ process_exit (void) {
 	/* 프로세스에 열린 모든 파일을 닫음 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의
 		최소값인 2가 될 때 까지 파일을 닫음 */
-	while (curr->fd > 2)
-	{
-		process_close_file(curr->fd);
-		curr->fd -= 1;
-	}
+	// for(int i = 0; i < FDT_COUNT_LIMIT; i++)
+	// {
+	// 	close(i);
+	// }
+	// palloc_free_multiple(curr->fdt, 3);
+
+	// file_close(curr->running_file);
+
+	// sema_up(&curr->sema_wait);
+	// sema_down(&curr->sema_free);
+
 	palloc_free_multiple(curr->fdt, 3);
+	file_close(curr->running_file);
+	sema_up(&curr->sema_wait);
+	sema_down(&curr->sema_free);
 	
 	/* 파일 디스크립터 테이블 메모리 해제 */
 	process_cleanup ();
@@ -507,6 +547,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
+	t->running_file = file; // thread 구조체의 running_file을 현재 실행할 파일로 초기화
+	file_deny_write(file);	// file_deny_write()를 이룔하여 파일에 대한 write를 거부
+
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) {
@@ -578,7 +621,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 
@@ -798,7 +841,7 @@ setup_stack (struct intr_frame *if_) {
 int process_add_file(struct file *f)
 {
 	struct thread* curr = thread_current();
-	while(curr->fdt[curr->fd] != NULL && curr->fd < FDT_COUNT_LIMIT)
+	while(curr->fdt[curr->fd] && curr->fd < FDT_COUNT_LIMIT)
 	{
 		/* 파일 디스크립터의 최대값 1 증가 */
 		curr->fd++;
@@ -840,12 +883,12 @@ void process_close_file(int fd)
 struct thread* get_child_process(int pid)
 {
 	struct thread *curr = thread_current();
-	struct list_elem *child_elem = list_begin(&curr->child_list);
+	struct list *childs = &curr->child_list;
+	struct list_elem *elem = list_begin(childs);
 	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
-	for(child_elem; list_end(&curr->child_list); 
-		child_elem = list_next(child_elem))
+	for(;elem != list_end(childs); elem = list_next(elem))
 	{
-		struct thread *child_thread = list_entry(child_elem, struct thread, elem);
+		struct thread *child_thread = list_entry(elem, struct thread, child_elem);
 		if(child_thread->tid == pid)
 		{
 			/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */

@@ -117,34 +117,6 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
-	// int exit_status;				//exit 호출 시 종료 status
-	
-	// struct file** fdt;
-	// int fd;
-
-	// struct list child_list;			// 자식 프로세스를 담을 리스트
-	// struct list_elem child_elem;	// 자식 리스트 element
-	// struct intr_frame parent_if;	// 유저 스택의 정보를 저장
-
-	// struct semaphore sema_fork;		// create 될 때 까지 기다림
-	// struct semaphore sema_wait;		// 자식 프로세스가 종료 될 때 까지 기다림
-	// struct semaphore sema_free;		// 자식 프로세스가 free될 때 까지 기다림
-	
-	// /* 부모 프로세스의 디스크립터 */
-	// tid_t parent;
-	// /* 프로세스의 프로그램 메모리 적재 유무 */
-	// bool is_mem;
-	// /* 프로세스가 종료 유무 확인 */
-	// bool is_on;
-	// /* exit 세마포어 */
-	// struct semaphore sema_exit;
-	// /* load 세마포어 */
-	// struct semaphore sema_load;
-
-#ifdef USERPROG
-	/* Owned by userprog/process.c. */
-	uint64_t *pml4;                     /* Page map level 4 */
-
 	int exit_status;				//exit 호출 시 종료 status
 	
 	struct file** fdt;
@@ -159,7 +131,7 @@ struct thread {
 	struct semaphore sema_free;		// 자식 프로세스가 free될 때 까지 기다림
 	
 	/* 부모 프로세스의 디스크립터 */
-	tid_t *parent;
+	struct thread *parent;
 	/* 프로세스의 프로그램 메모리 적재 유무 */
 	bool is_mem;
 	/* 프로세스가 종료 유무 확인 */
@@ -168,7 +140,12 @@ struct thread {
 	struct semaphore sema_exit;
 	/* load 세마포어 */
 	struct semaphore sema_load;
+	/* 현재 실행중인 파일 */
+	struct file *running_file;
 
+#ifdef USERPROG
+	/* Owned by userprog/process.c. */
+	uint64_t *pml4;                     /* Page map level 4 */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
