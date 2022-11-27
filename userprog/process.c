@@ -263,9 +263,10 @@ process_exec (void *f_name) {
 	success = load (file_name, &_if); // 복사한 전체 파일 인자로 넣음.
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
+	if (!success){
+		palloc_free_page (file_name);
 		return -1;
+	}
 
 
 	// 디버깅
