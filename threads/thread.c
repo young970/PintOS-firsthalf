@@ -229,7 +229,7 @@ thread_create (const char *name, int priority,
 	t->fdt[1] = 2;
 
 	/* 부모 프로세스 저장 */
-	t->parent = curr;
+	// t->parent = curr;
 	/* 프로그램이 로드되지 않음 */
 	t->is_mem = false;
 	/* 프로세스가 종료되지 않음 */

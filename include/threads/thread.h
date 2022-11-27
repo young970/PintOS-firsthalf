@@ -131,7 +131,7 @@ struct thread {
 	struct semaphore sema_free;		// 자식 프로세스가 free될 때 까지 기다림
 	
 	/* 부모 프로세스의 디스크립터 */
-	struct thread *parent;
+	// struct thread *parent;
 	/* 프로세스의 프로그램 메모리 적재 유무 */
 	bool is_mem;
 	/* 프로세스가 종료 유무 확인 */
