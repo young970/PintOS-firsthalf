@@ -534,7 +534,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-	file_deny_write()
+
 	/* Read and verify executable header. */
 	/* ELF파일의 헤더 정보를 읽어와 저장 */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
