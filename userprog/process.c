@@ -41,7 +41,6 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
-	char *save_ptr;
 	tid_t tid;
 
 	/* Make a copy of FILE_NAME.
@@ -51,6 +50,7 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	char *save_ptr;
 	strtok_r(file_name, " ", save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
@@ -97,24 +97,23 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_) {
-	// printf("=====================process_fork진입=================\n");
 	/* Clone current thread to new thread.*/
-	struct thread* curr = thread_current();
-	memcpy(&curr->parent_if,if_,sizeof(struct intr_frame));
-	tid_t child_id = thread_create (name,PRI_DEFAULT, __do_fork, curr);//parent -> child로 context 스위칭
-	// printf("=====================thread_create 진입후 나옴=================\n");
-	if(child_id == TID_ERROR){
+	struct thread *curr = thread_current();
+	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
+
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
+	if(tid == TID_ERROR)
+	{
 		return TID_ERROR;
 	}
-	struct thread* child = get_child_process(child_id);
-	// printf("====================child_id:%d, exit_status:%d ==================\n", child_id, child->exit_status);
-	sema_down(&child->sema_fork);
-	// printf("====================sema_down 후 exit_status:%d==================\n", child->exit_status);
-	if (child->exit_status == -1) {
+	struct thread *child_thread = get_child_process(tid);
+	sema_down(&child_thread->sema_fork);
+	// printf("-------------------------child id : %d----child_thread->exit_status : %d\n", tid, child_thread->exit_status);
+	if(child_thread->exit_status == -1)
+	{
 		return TID_ERROR;
 	}
-	// printf("====================child_id:%d==================\n", child_id);
-	return child_id;
+	return tid;
 }
 
 #ifndef VM
@@ -177,15 +176,11 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
+	struct intr_frame *parent_if = &parent->parent_if;
 	bool succ = true;
-	parent_if = &parent->parent_if;
 
 	/* 1. Read the cpu context to local stack. */
-	memcpy (&if_, &parent->parent_if, sizeof (struct intr_frame));
-
-
-	if_.R.rax = 0;//Fork()가 자식에게 리턴할때는 0 리턴
+	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -208,43 +203,38 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	/* System call 추가 */
-	// process_init ();
-	// multi-oom) Failed to duplicate
-	if (parent->fdt == FDT_COUNT_LIMIT)
-		goto error;
-
-	int fd_index = 2;
-	struct file** parent_fdt = parent->fdt;
-	struct file** child_fdt = current->fdt;
-	while (fd_index < FDT_COUNT_LIMIT)
+	if(parent->fd == FDT_COUNT_LIMIT)
 	{
-		struct file* parent_file = parent_fdt[fd_index];
-		if(parent_file != NULL){
-			if(parent_file > 2){
-				struct file* child_file = file_duplicate(parent_file);
-				child_fdt[fd_index] = child_file;
-			}else{
-				child_fdt[fd_index] = parent_file;
-			}
+		goto error;
+	}
+
+	current->fdt[0] = parent->fdt[0];
+	current->fdt[1] = parent->fdt[1];
+
+	for(int i = 2; i < FDT_COUNT_LIMIT; i++)
+	{
+		struct file *f = parent->fdt[i];
+		if(f == NULL)
+		{
+			continue;
 		}
-		fd_index++;
+		current->fdt[i] = file_duplicate(f);
 	}
 	current->fd = parent->fd;
 
 	sema_up(&current->sema_fork);
-	//process_init ();
+	if_.R.rax = 0;
+	process_init();
 
 	/* Finally, switch to the newly created process. */
-	if (succ){
+	if (succ)
 		do_iret (&if_);
-	}
-		
 error:
 	current->exit_status = TID_ERROR;
 	sema_up(&current->sema_fork);
 	exit(TID_ERROR);
-}
+	// thread_exit ();
+}exec;
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
@@ -277,9 +267,9 @@ process_exec (void *f_name) {
 	if (!success)
 		return -1;
 
+
 	// 디버깅
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	
 	/* Start switched process. */
 	do_iret (&_if);
@@ -356,26 +346,34 @@ void argument_stack(char **argv, int count, struct intr_frame* if_)
 	하위 항목이 아니거나, 지정된 child_tid에 대해 process_wait가 이미 호출된
 	경우 -1을 즉시 반환.
 	이 기능은 2-2에서 구현 */
-int process_wait (tid_t child_tid UNUSED) {
+int
+process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	/* 자식 프로세스가 모두 종료될 때 까지 대기(sleep state) */
+	/* 자식 프로세스가 올바르게 종료 됐는지 확인 */
+
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	/* 예외 처리 발생 시 -1 리턴 */
+	/* 자식 프로세스가 종료될 때 까지 부모 프로세스 대기 (세마포어 이용) */
+	/* 자식 프로세스 디스크립터 삭제 */
+	/* 자식 프로세스의 exit status 리턴 */
 
 	struct thread *child = get_child_process(child_tid);
 
-	// [Fail] Not my child
-	if (child == NULL)
+	if(child == NULL)
+	{
 		return -1;
+	}
 
-	// Parent waits until child signals (sema_up) after its execution
 	sema_down(&child->sema_wait);
-
 	int exit_status = child->exit_status;
-
-	// Keep child page so parent can get exit_status
 	list_remove(&child->child_elem);
-	sema_up(&child->sema_free); // wake-up child in process_exit - proceed with thread_exit
-	return exit_status;	
+	sema_up(&child->sema_free);
+
+	// thread_set_priority(thread_get_priority()-1);
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -390,20 +388,23 @@ process_exit (void) {
 	/* 프로세스에 열린 모든 파일을 닫음 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터의
 		최소값인 2가 될 때 까지 파일을 닫음 */
-	// while (curr->fd > 2)
+	// for(int i = 0; i < FDT_COUNT_LIMIT; i++)
 	// {
-	// 	process_close_file(curr->fd);
-	// 	curr->fd -= 1;
+	// 	close(i);
 	// }
 	// palloc_free_multiple(curr->fdt, 3);
-	
-	// /* 파일 디스크립터 테이블 메모리 해제 */
-	// process_cleanup ();
 
-	palloc_free_multiple(curr->fdt,FDT_PAGES);
-	file_close(curr->running);
+	// file_close(curr->running_file);
+
+	// sema_up(&curr->sema_wait);
+	// sema_down(&curr->sema_free);
+
+	palloc_free_multiple(curr->fdt, 3);
+	file_close(curr->running_file);
 	sema_up(&curr->sema_wait);
 	sema_down(&curr->sema_free);
+	
+	/* 파일 디스크립터 테이블 메모리 해제 */
 	process_cleanup ();
 }
 
@@ -532,7 +533,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-
+	file_deny_write()
 	/* Read and verify executable header. */
 	/* ELF파일의 헤더 정보를 읽어와 저장 */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -545,6 +546,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
+
+	t->running_file = file; // thread 구조체의 running_file을 현재 실행할 파일로 초기화
+	file_deny_write(file);	// file_deny_write()를 이룔하여 파일에 대한 write를 거부
 
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
@@ -837,7 +841,7 @@ setup_stack (struct intr_frame *if_) {
 int process_add_file(struct file *f)
 {
 	struct thread* curr = thread_current();
-	while(curr->fdt[curr->fd] != NULL && curr->fd < FDT_COUNT_LIMIT)
+	while(curr->fdt[curr->fd] && curr->fd < FDT_COUNT_LIMIT)
 	{
 		/* 파일 디스크립터의 최대값 1 증가 */
 		curr->fd++;
@@ -878,30 +882,34 @@ void process_close_file(int fd)
 
 struct thread* get_child_process(int pid)
 {
-	struct thread* curr = thread_current();
-	struct list* childs = &curr->child_list;
-	struct list_elem* elem = list_begin(childs);
-	while(elem != list_end(childs)){
-		struct thread* target = list_entry(elem,struct thread,child_elem);
-		if(target->tid == pid){
-			return target;
+	struct thread *curr = thread_current();
+	struct list *childs = &curr->child_list;
+	struct list_elem *elem = list_begin(childs);
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
+	for(;elem != list_end(childs); elem = list_next(elem))
+	{
+		struct thread *child_thread = list_entry(elem, struct thread, child_elem);
+		if(child_thread->tid == pid)
+		{
+			/* 해당 pid가 존재하면 프로세스 디스크립터 반환 */
+			return child_thread;
 		}
-		elem = list_next(elem);
 	}
+	/* 리스트에 존재하지 않으면 NULL 리턴 */
 	return NULL;
 }
 
-// void remove_child_process(struct thread *cp)
-// {
-// 	struct thread *curr = thread_current();
-// 	struct list_elem *child_elem = &cp->child_elem;
-// 	/* 자식 리스트에서 제거 */
-// 	for(struct list_elem *current_child_elem = list_begin(&curr->child_list);
-// 		current_child_elem != list_end(&curr->child_list); list_next(current_child_elem))
-// 		{
-// 			/* 확인 요망 */
-// 			if(current_child_elem == child_elem) list_remove(current_child_elem);
-// 		}
-// 	/* 프로세스 디스크립터 메모리 해제 */
-// 	palloc_free_page(cp);
-// }
+void remove_child_process(struct thread *cp)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *child_elem = &cp->child_elem;
+	/* 자식 리스트에서 제거 */
+	for(struct list_elem *current_child_elem = list_begin(&curr->child_list);
+		current_child_elem != list_end(&curr->child_list); list_next(current_child_elem))
+		{
+			/* 확인 요망 */
+			if(current_child_elem == child_elem) list_remove(current_child_elem);
+		}
+	/* 프로세스 디스크립터 메모리 해제 */
+	palloc_free_page(cp);
+}

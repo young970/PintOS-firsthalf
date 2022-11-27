@@ -222,15 +222,15 @@ thread_create (const char *name, int priority,
 	// printf("=====================t->exit_status = 0;=================\n");
 	/* fdt 메모리 할당 */
 	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
-	if(t->fdt == NULL){
+	if(t->fdt == NULL)
+	{
 		return TID_ERROR;
 	}
-	t->fd = 2;
 	t->fdt[0] = 1;
 	t->fdt[1] = 2;
 
 	/* 부모 프로세스 저장 */
-	t->parent = curr->tid;
+	// t->parent = curr;
 	/* 프로그램이 로드되지 않음 */
 	t->is_mem = false;
 	/* 프로세스가 종료되지 않음 */
@@ -423,9 +423,7 @@ bool cmp_priority(const struct list_elem* a_, const struct list_elem* b_, void* 
 
 	struct thread* a_thread = list_entry(a_, struct thread, elem);
 	struct thread* b_thread = list_entry(b_, struct thread, elem);
-	if (a_thread->priority > b_thread->priority)
-		return 1;
-	return 0;
+	return (a_thread->priority > b_thread->priority) ? true : false;
 }
 
 /* Returns the name of the running thread. */
