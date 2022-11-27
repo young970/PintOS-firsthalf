@@ -218,9 +218,14 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	t->exit_status = 0;
+	// printf("=====================t->exit_status = 0;=================\n");
 	/* fdt 메모리 할당 */
-	t->fd = 2;
 	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
+	if(t->fdt == NULL){
+		return TID_ERROR;
+	}
+	t->fd = 2;
 	t->fdt[0] = 1;
 	t->fdt[1] = 2;
 
@@ -616,8 +621,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->init_priority = priority;
 	list_init(&t->donations);
 	t->wait_on_lock = NULL;
-	t->exit_status = 0;
-
+	// t->exit_status = 0;
 	list_init(&t->child_list);
 
 	sema_init(&t->sema_fork, 0);
