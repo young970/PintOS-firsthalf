@@ -35,6 +35,7 @@ void syscall_handler (struct intr_frame *);
 
 void
 syscall_init (void) {
+	lock_init(&filesys_lock);
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
 			((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
@@ -44,7 +45,6 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -73,12 +73,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 
 	case SYS_EXEC:
-		f->R.rax = exec(f->R.rdi);
+		if(exec(f->R.rdi) == -1)
+		exit(-1);
 		break;
 
-	// case SYS_WAIT:
-	// 	wait();
-	// 	break;
+	case SYS_WAIT:
+		f->R.rax = wait(f->R.rdi);
+		break;
 
 	case SYS_CREATE:
 		f->R.rax = create(f->R.rdi, f->R.rsi);
@@ -117,6 +118,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 		
 	default:
+		thread_exit();
 		break;
 	}
 	/* 0 : halt */
@@ -172,7 +174,7 @@ void exit(int status)
 	struct thread *cur = thread_current();
 	cur->exit_status = status;
 	/* 정상적으로 종료 시 status는 0 */
-	printf("%s: exit(%d)\n", cur->name, cur->exit_status);
+	printf("%s: exit(%d)\n", cur->name, status);
 
 	/* 종료 시 "프로세스 이름: exit(status)" 출력(Process Termination Message) */
 	/* status 확인 요망 */
@@ -183,7 +185,7 @@ void exit(int status)
 /* 확인 요망 (나중에 구현!!!) */
 tid_t fork(const char *thread_name, struct intr_frame *f)
 {
-
+	// check_address(thread_name);
 	// struct thread* cur = thread_current();
 	return process_fork(thread_name, f);
 	/* 프로세스 생성 시 부모 thread 구조체 안 list에 자식 thread 추가 */
@@ -198,15 +200,17 @@ int exec(const char *cmd_line)
 	char *fn_copy = palloc_get_page(PAL_ZERO);
 	if ((fn_copy) == NULL) {
 		exit(-1);
-		return -1;
+		// return -1;
 	}
 	strlcpy(fn_copy, cmd_line, size);
 
 	if(process_exec(fn_copy) == -1)
 	{
-		exit(-1);
+		// exit(-1);
 		return -1;
 	}
+	NOT_REACHED();
+	return 0;
 
 	/* 자식 프로세스를 생성하고 프로그램을 실행시키는 시스템 콜 */
 	/* 프로세스 생성에 성공 시 생성된 프로세스에 pid 값을 반환, 실패 시 -1 반환 */
