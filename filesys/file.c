@@ -123,6 +123,7 @@ file_deny_write (struct file *file) {
 		inode_deny_write (file->inode);
 	}
 }
+// check
 
 /* Re-enables write operations on FILE's underlying inode.
  * (Writes might still be denied by some other file that has the
