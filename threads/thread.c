@@ -219,7 +219,7 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	t->exit_status = 0;
-	// printf("=====================t->exit_status = 0;=================\n");
+
 	/* fdt 메모리 할당 */
 	t->fdt = palloc_get_multiple(PAL_ZERO, 3);
 	if(t->fdt == NULL)
@@ -228,7 +228,7 @@ thread_create (const char *name, int priority,
 	}
 	t->fdt[0] = 1;
 	t->fdt[1] = 2;
-
+	//adasfasfsdgfdgafdgfdag
 	/* 부모 프로세스 저장 */
 	// t->parent = curr;
 	/* 프로그램이 로드되지 않음 */
